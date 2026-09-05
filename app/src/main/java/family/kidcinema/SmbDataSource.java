@@ -33,7 +33,7 @@ public final class SmbDataSource extends BaseDataSource {
         if (remaining == 0) return C.RESULT_END_OF_INPUT;
         try {
             int read = file.read(buffer, position, offset, (int) Math.min(length, remaining));
-            if (read <= 0) return C.RESULT_END_OF_INPUT;
+            if (read <= 0) throw new java.io.EOFException("家庭视频尚未读完，连接提前结束");
             position += read; remaining -= read; bytesTransferred(read); return read;
         } catch (Exception e) { throw new IOException("局域网读取中断，请返回后重试", e); }
     }

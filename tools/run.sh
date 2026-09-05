@@ -33,4 +33,4 @@ if [ "${1:-}" = "--build" ] || [ ! -f app/build/outputs/apk/debug/app-debug.apk 
 fi
 adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
 adb -s emulator-5554 shell am start -n family.kidcinema/.MainActivity
-echo '小小影院已在模拟器中打开。'
+echo '思思影院已在模拟器中打开。'

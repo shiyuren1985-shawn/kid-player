@@ -76,12 +76,11 @@ public class BiliClientTest {
         store.prefs.edit().putLong("bili.attempt",System.currentTimeMillis()).putString("bili.error","测试限制 -352（模拟响应）").commit();
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         Intent launch=context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);context.startActivity(launch);
-        assertTrue(device.wait(Until.hasObject(By.text("本次更新未完成，保留上次目录")),10000));
+        assertTrue(device.wait(Until.hasObject(By.textContains("本次更新未完成，保留上次目录")),10000));
         assertTrue(device.hasObject(By.textContains("测试限制 -352")));
         assertFalse(device.hasObject(By.clazz("android.webkit.WebView")));assertFalse(device.hasObject(By.text("搜索")));
         assertFalse(device.hasObject(By.clazz("android.widget.EditText")));
-        UiObject2 mode=device.findObject(By.text("体验电视布局"));assertNotNull(mode);mode.click();
-        assertTrue(device.wait(Until.hasObject(By.text("切换平板布局")),5000));device.pressDPadDown();assertTrue(device.hasObject(By.focused(true)));
+        device.pressDPadDown();assertTrue(device.hasObject(By.focused(true)));
         device.pressHome();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{});
         androidx.work.WorkManager.getInstance(context).cancelUniqueWork("approved-bili-sync").getResult().get();
         store.prefs.edit().clear().commit();

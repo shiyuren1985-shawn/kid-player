@@ -10,25 +10,41 @@ import java.util.*;
 public final class BiliClient {
     interface Transport { JSONObject get(String path) throws Exception; }
     private final Transport transport;
-    public BiliClient() { this(BiliClient::request); }
-    BiliClient(Transport transport) { this.transport=transport; }
+    private final long uid;
+    public BiliClient() {this(BiliPolicy.UID);}
+    private volatile boolean cancelled;
+    private final java.util.Set<HttpURLConnection> requests=java.util.concurrent.ConcurrentHashMap.newKeySet();
+    public BiliClient(long uid) {this.uid=BiliPolicy.creatorUid(uid);this.transport=this::request;}
+    public void cancel() {cancelled=true;for(HttpURLConnection connection:requests)connection.disconnect();}
+    BiliClient(Transport transport) {this(BiliPolicy.UID,transport);}
+    BiliClient(long uid,Transport transport) {this.uid=BiliPolicy.creatorUid(uid);this.transport=transport;}
+    public AppStore.Creator profile() throws Exception {
+        JSONObject card=data(transport.get("/x/web-interface/card?mid="+uid)).getJSONObject("card");
+        BiliPolicy.owner(Long.parseLong(card.getString("mid")),uid);
+        String name=card.getString("name").trim();
+        if(name.isEmpty())throw new IOException("UP 主资料不完整");
+        return new AppStore.Creator(uid,name,BiliPolicy.imageUrl(card.optString("face")),true);
+    }
     static final String REFERER="https://www.bilibili.com/";
     static final String UA="Mozilla/5.0";
-    private static JSONObject request(String path) throws Exception {
+    private JSONObject request(String path) throws Exception {
+        if(cancelled)throw new java.io.InterruptedIOException();
         if(!path.startsWith("/x/"))throw new IOException("接口地址无效");
         HttpURLConnection connection=(HttpURLConnection)new URL("https://api.bilibili.com"+path).openConnection();
+        requests.add(connection);
         connection.setConnectTimeout(12000);connection.setReadTimeout(12000);connection.setInstanceFollowRedirects(false);
         connection.setRequestProperty("User-Agent",UA);connection.setRequestProperty("Referer",REFERER);
         try {
+            if(cancelled||Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException();
             int status=connection.getResponseCode();
             if(status!=200)throw new IOException("B 站暂未允许访问（HTTP "+status+"）。未跳转或尝试绕过限制。");
             try(InputStream in=connection.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
                 byte[] buffer=new byte[8192];int n;
-                while((n=in.read(buffer))!=-1){if(out.size()+n>2_000_000)throw new IOException("接口响应过大");out.write(buffer,0,n);}
+                while((n=in.read(buffer))!=-1){if(cancelled||Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException();if(out.size()+n>2_000_000)throw new IOException("接口响应过大");out.write(buffer,0,n);}
                 try{return new JSONObject(out.toString(StandardCharsets.UTF_8.name()));}
                 catch(JSONException e){throw new IOException("B 站返回了无法识别的响应。");}
             }
-        } finally {connection.disconnect();}
+        } finally {requests.remove(connection);connection.disconnect();}
     }
     static JSONObject data(JSONObject response) throws Exception {
         int code=response.getInt("code");
@@ -43,35 +59,38 @@ public final class BiliClient {
         JSONObject nav=transport.get("/x/web-interface/nav");
         if(nav.getInt("code")!=0 && nav.getInt("code")!=-101)data(nav);
         JSONObject keys=nav.getJSONObject("data").getJSONObject("wbi_img");
-        Map<String,String> params=new HashMap<>();params.put("mid",Long.toString(BiliPolicy.UID));params.put("pn","1");params.put("ps","30");params.put("order","pubdate");
+        Map<String,String> params=new HashMap<>();params.put("mid",Long.toString(uid));params.put("pn","1");params.put("ps","30");params.put("order","pubdate");
         String query=BiliPolicy.signedQuery(params,imageKey(keys.getString("img_url")),imageKey(keys.getString("sub_url")),System.currentTimeMillis()/1000);
         JSONObject response=data(transport.get("/x/space/wbi/arc/search?"+query));
         JSONArray rows=response.getJSONObject("list").getJSONArray("vlist"), videos=new JSONArray();
         if(rows.length()>30)throw new IOException("投稿列表超过本次同步范围");
         Set<String> seen=new HashSet<>();
         for(int i=0;i<rows.length();i++){
-            JSONObject row=rows.getJSONObject(i);BiliPolicy.owner(row.getLong("mid"));
+            JSONObject row=rows.getJSONObject(i);BiliPolicy.owner(row.getLong("mid"),uid);
             String id=BiliPolicy.bvid(row.getString("bvid"));if(!seen.add(id))continue;
-            videos.put(new JSONObject().put("bvid",id).put("uid",BiliPolicy.UID).put("title",row.getString("title"))
+            videos.put(new JSONObject().put("bvid",id).put("uid",uid).put("title",row.getString("title"))
                 .put("author",row.getString("author")).put("published",row.getLong("created")).put("duration",row.optString("length")));
         }
-        return new JSONObject().put("schema",1).put("uid",BiliPolicy.UID).put("syncedAt",System.currentTimeMillis()).put("videos",videos);
+        return new JSONObject().put("schema",1).put("uid",uid).put("syncedAt",System.currentTimeMillis()).put("videos",videos);
     }
-    public JSONObject syncCollections() throws Exception {return new BiliCollections(transport).sync();}
-    public static List<LibraryItem> items(JSONObject feed) throws Exception {
-        if(feed.getInt("schema")!=1)throw new IOException("目录格式不支持");BiliPolicy.owner(feed.getLong("uid"));
+    public JSONObject syncCollections() throws Exception {return new BiliCollections(uid,transport).sync();}
+    public static List<LibraryItem> items(JSONObject feed) throws Exception {return items(feed,BiliPolicy.UID);}
+    public static List<LibraryItem> items(JSONObject feed,long uid) throws Exception {
+        if(feed.getInt("schema")!=1)throw new IOException("目录格式不支持");BiliPolicy.owner(feed.getLong("uid"),uid);
         JSONArray rows=feed.getJSONArray("videos");if(rows.length()>30)throw new IOException("目录过大");
         List<LibraryItem> items=new ArrayList<>();Set<String> seen=new HashSet<>();
         for(int i=0;i<rows.length();i++){
-            JSONObject row=rows.getJSONObject(i);BiliPolicy.owner(row.getLong("uid"));String id=BiliPolicy.bvid(row.getString("bvid"));
+            JSONObject row=rows.getJSONObject(i);BiliPolicy.owner(row.getLong("uid"),uid);String id=BiliPolicy.bvid(row.getString("bvid"));
             if(!seen.add(id))continue;
             String date=new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.CHINA).format(new Date(row.getLong("published")*1000));
-            items.add(LibraryItem.online(row.getString("title"),id,row.getString("author")+" · "+date+" · "+row.optString("duration"),i%4));
+            items.add(LibraryItem.online(row.getString("title"),id,row.getString("author")+" · "+date+" · "+row.optString("duration"),i%4,uid,safeImage(row.optString("pic"))));
         }
         return items;
     }
-    public static boolean contains(JSONObject feed,String id) throws Exception {
-        BiliPolicy.bvid(id);for(LibraryItem item:items(feed))if(item.path.equals(id))return true;return false;
+    private static String safeImage(String image) {try{return BiliPolicy.imageUrl(image);}catch(Exception e){return "";}}
+    public static boolean contains(JSONObject feed,String id) throws Exception {return contains(feed,id,BiliPolicy.UID);}
+    public static boolean contains(JSONObject feed,String id,long uid) throws Exception {
+        BiliPolicy.bvid(id);for(LibraryItem item:items(feed,uid))if(item.path.equals(id))return true;return false;
     }
     public static final class Playback {
         final String video,audio;final long cid;
@@ -86,7 +105,7 @@ public final class BiliClient {
         BiliPolicy.bvid(id);
         JSONObject view=data(transport.get("/x/web-interface/view?bvid="+id));
         if(!id.equals(view.getString("bvid")))throw new IOException("视频身份不匹配");
-        BiliPolicy.owner(view.getJSONObject("owner").getLong("mid"));
+        BiliPolicy.owner(view.getJSONObject("owner").getLong("mid"),uid);
         if(view.getInt("state")!=0 || view.optBoolean("is_upower_exclusive") || view.optInt("is_upower_exclusive")!=0 || view.getJSONObject("rights").optInt("pay")!=0 || view.getJSONObject("rights").optInt("ugc_pay")!=0)
             throw new IOException("本原型只尝试可公开播放的视频，不处理付费或受限内容。");
         JSONArray pages=view.getJSONArray("pages");

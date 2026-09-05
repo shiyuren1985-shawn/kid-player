@@ -44,6 +44,23 @@ public class PlaybackRegressionTest {
         main(()->{assertEquals(position[0],player().getCurrentPosition(),200);player().play();});
         await(()->player().getCurrentPosition()>position[0]+800,5000,"Resume did not advance");
     }
+    @Test public void transientAudioFocusLossPausesAndGainResumes() throws Exception {
+        AppStore store=new AppStore(context());store.prefs.edit().clear().commit();store.demo(true);
+        activity.launchActivity(intent(false,"sample-0"));
+        await(()->player()!=null&&player().getCurrentPosition()>500,15000,"Demo did not start");
+        android.media.AudioManager audio=(android.media.AudioManager)context().getSystemService(Context.AUDIO_SERVICE);
+        android.media.AudioFocusRequest focus=new android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).build())
+            .setOnAudioFocusChangeListener(change->{},new android.os.Handler(android.os.Looper.getMainLooper())).build();
+        try {
+            assertEquals(android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED,audio.requestAudioFocus(focus));
+            await(()->!player().isPlaying(),4000,"Transient focus loss did not pause playback");
+            long[] position={0};main(()->position[0]=player().getCurrentPosition());SystemClock.sleep(1000);
+            main(()->assertEquals(position[0],player().getCurrentPosition(),200));
+            audio.abandonAudioFocusRequest(focus);
+            await(()->player().isPlaying()&&player().getCurrentPosition()>position[0]+500,5000,"Focus gain did not resume");
+        }finally{audio.abandonAudioFocusRequest(focus);}
+    }
     @Test public void liveThreeApprovedVideosDecodeSeekPauseAndResume() throws Exception {
         Assume.assumeTrue("Run with -e liveBili true", "true".equals(InstrumentationRegistry.getArguments().getString("liveBili")));
         AppStore store=new AppStore(context());store.prefs.edit().clear().commit();store.online(true);

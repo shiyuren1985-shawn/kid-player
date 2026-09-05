@@ -16,8 +16,14 @@ public final class BiliPolicy {
         if (value == null || !value.matches("BV[0-9A-Za-z]{10}")) throw new IllegalArgumentException("视频编号不正确");
         return value;
     }
-    public static void owner(long uid) {
-        if (uid != UID) throw new IllegalArgumentException("不在家长指定的作者范围内");
+    public static long creatorUid(long uid) {
+        if(uid<=0)throw new IllegalArgumentException("请填写有效的 UP 主 UID");
+        return uid;
+    }
+    public static void owner(long uid) {owner(uid,UID);}
+    public static void owner(long uid,long expected) {
+        creatorUid(expected);
+        if (uid != expected) throw new IllegalArgumentException("不在家长指定的作者范围内");
     }
     public static String mediaUrl(String value) {
         URI uri = URI.create(value); String host = uri.getHost();
@@ -25,6 +31,14 @@ public final class BiliPolicy {
             (uri.getPort() != -1 && uri.getPort() != 443) || uri.getFragment() != null ||
             !(host.endsWith(".bilivideo.com") || host.endsWith(".bilivideo.cn")))
             throw new IllegalArgumentException("播放地址不在允许的视频域名内");
+        return value;
+    }
+    public static String imageUrl(String value) {
+        if(value==null || value.isEmpty())return "";
+        if(value.startsWith("http://"))value="https://"+value.substring(7);
+        URI uri=URI.create(value);String host=uri.getHost();
+        if(!"https".equals(uri.getScheme())||host==null||!(host.equals("hdslb.com")||host.endsWith(".hdslb.com"))||uri.getUserInfo()!=null||uri.getFragment()!=null||(uri.getPort()!=-1&&uri.getPort()!=443))
+            throw new IllegalArgumentException("图片地址不在允许范围内");
         return value;
     }
     // Public WBI parameter signing; no login tokens, device simulation, or challenge handling.

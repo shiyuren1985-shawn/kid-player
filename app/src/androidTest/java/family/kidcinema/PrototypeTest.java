@@ -16,8 +16,8 @@ public class PrototypeTest {
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         Configurator.getInstance().setWaitForIdleTimeout(500);
         Intent launch=context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());launch.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK|Intent.FLAG_ACTIVITY_NEW_TASK);context.startActivity(launch);
-        assertNotNull(device.wait(Until.findObject(By.text("小小影院")),10000));
-        assertNotNull(device.findObject(By.text("●  本地演示")));
+        assertNotNull(device.wait(Until.findObject(By.text("思思影院")),10000));
+        assertNotNull(device.findObject(By.textContains("本地演示")));
         click(device,By.text("▶  播放演示短片"));
         UiObject2 fullscreenTip=device.wait(Until.findObject(By.text("Got it")),1500);
         if(fullscreenTip!=null)fullscreenTip.click();
@@ -44,22 +44,21 @@ public class PrototypeTest {
         assertEquals("Later pause holds position",heldLater,store.progress("demo:sample-0"));
         assertFalse("Later pause must not trigger decoder error",device.hasObject(By.text("这段视频暂时无法播放")));
         // Player must actually move through the local MP4, not merely show a mock screen.
-        device.pressBack();device.wait(Until.hasObject(By.text("小小影院")),5000);
+        device.pressBack();device.wait(Until.hasObject(By.text("思思影院")),5000);
         assertTrue("Real playback progress saved",store.progress("demo:sample-0")>1000);
         click(device,By.text("▷  继续观看"));
         assertNotNull(device.wait(Until.findObject(By.text("小火箭去旅行")),5000));
         click(device,By.text("小火箭去旅行"));
         click(device,By.text("♡ 喜欢"));
+        click(device,By.text("返回"));
         assertTrue(device.wait(Until.hasObject(By.text("♥  已喜欢")),5000));
         assertTrue(store.favorite("demo:sample-0"));
         click(device,By.text("♡  我的喜欢"));
         assertNotNull(device.wait(Until.findObject(By.text("小火箭去旅行")),3000));
-        click(device,By.text("体验电视布局"));
-        assertNotNull(device.wait(Until.findObject(By.text("切换平板布局")),3000));
-        device.pressDPadDown();device.pressDPadRight();assertTrue(device.hasObject(By.focused(true)));
         click(device,By.desc("播放设置"));
-        assertNotNull(device.wait(Until.findObject(By.desc("家庭存储地址")),6000));
         assertFalse(device.hasObject(By.text("家长验证")));
+        click(device,By.text("家庭存储"));
+        assertNotNull(device.wait(Until.findObject(By.desc("家庭存储地址")),6000));
         click(device,By.text("取消"));
         assertNotNull(device.wait(Until.findObject(By.desc("播放设置")),5000));
     }

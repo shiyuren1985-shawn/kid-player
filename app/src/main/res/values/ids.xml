@@ -1,0 +1,7 @@
+<resources>
+    <item name="source_online" type="id" />
+    <item name="source_smb" type="id" />
+    <item name="source_demo" type="id" />
+    <item name="creators_cloud" type="id" />
+    <item name="creators_local" type="id" />
+</resources>
