@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "uid": 402576555,
+  "syncedAt": 0,
+  "seededAt": "2026-09-04",
+  "videos": [
+    {
+      "bvid": "BV1Yptj6zEEG",
+      "uid": 402576555,
+      "title": "【花小烙】手上的汗疱疹是怎么冒出来的？",
+      "author": "画渣花小烙",
+      "published": 1788343200,
+      "duration": "04:46"
+    },
+    {
+      "bvid": "BV1mkg36zEfX",
+      "uid": 402576555,
+      "title": "【花小烙】大家好！我是蚊子，这期视频由我来给大家读评论哦！",
+      "author": "画渣花小烙",
+      "published": 1786788000,
+      "duration": "06:34"
+    },
+    {
+      "bvid": "BV1UFge6qEty",
+      "uid": 402576555,
+      "title": "【花小烙】游隼：地球上俯冲速度最快的“鸟中战斗机”是如何炼成的？",
+      "author": "画渣花小烙",
+      "published": 1785405600,
+      "duration": "07:34"
+    }
+  ]
+}
