@@ -228,8 +228,8 @@ public class PlayerActivity extends Activity {
         }
         View focus=getCurrentFocus();boolean onActions=focus!=null&&isInside(focus,actionArea);
         if(ended||failureScreen!=null||onActions)return super.dispatchKeyEvent(event);
+        if(player!=null&&event.getAction()==KeyEvent.ACTION_DOWN&&event.getKeyCode()==KeyEvent.KEYCODE_DPAD_DOWN){playerView.hideController();pauseButton.requestFocusFromTouch();return true;}
         if (player != null && event.getAction()==KeyEvent.ACTION_DOWN && !playerView.isControllerFullyVisible()) {
-            if(event.getKeyCode()==KeyEvent.KEYCODE_DPAD_DOWN){pauseButton.requestFocusFromTouch();return true;}
             if(event.getKeyCode()==KeyEvent.KEYCODE_DPAD_LEFT){player.seekBack();playerView.showController();return true;}
             if(event.getKeyCode()==KeyEvent.KEYCODE_DPAD_RIGHT){player.seekForward();playerView.showController();return true;}
             if(event.getKeyCode()==KeyEvent.KEYCODE_DPAD_CENTER){if(player.isPlaying())player.pause();else player.play();playerView.showController();return true;}

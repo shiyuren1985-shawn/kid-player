@@ -44,6 +44,13 @@ public class EasyPlayerTest {
         main(()->assertEquals("播放视频",String.valueOf(activity.getActivity().getCurrentFocus().getContentDescription())));
         device.pressDPadRight();device.pressDPadCenter();await(()->store.favorite("demo:sample-0"),3000,"Right then confirm favorites without central controls stealing focus");
     }
+    @Test public void downEntersPersistentButtonsWhileCentralControlsAreVisible()throws Exception{
+        startDemo();java.lang.reflect.Field f=PlayerActivity.class.getDeclaredField("playerView");f.setAccessible(true);androidx.media3.ui.PlayerView view=(androidx.media3.ui.PlayerView)f.get(activity.getActivity());
+        main(()->view.showController());device.pressDPadDown();
+        await(()->activity.getActivity().getCurrentFocus()!=null&&"暂停视频".contentEquals(activity.getActivity().getCurrentFocus().getContentDescription()),3000,"Down enters pause even with central controls visible");
+        main(()->assertFalse(view.isControllerFullyVisible()));device.pressDPadCenter();await(()->!player().getPlayWhenReady(),3000,"Remote pauses from persistent buttons");
+        device.pressDPadRight();device.pressDPadCenter();await(()->store.favorite("demo:sample-0"),3000,"Favorite remains accessible immediately after pause");
+    }
     @Test public void liveEndCardPlaysAnotherApprovedVideoWithoutDialog()throws Exception{
         Assume.assumeTrue("Explicit live opt-in","true".equals(InstrumentationRegistry.getArguments().getString("liveBili")));store.online(true);
         java.util.List<LibraryItem> feed=BiliClient.items(store.feed());LibraryItem current=feed.get(0),next=feed.get(1);
