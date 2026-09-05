@@ -88,6 +88,12 @@ public class PlayerActivity extends Activity {
         for(Button button:new Button[]{back,pauseButton,favoriteButton,close}){GridLayout.LayoutParams params=new GridLayout.LayoutParams();params.width=0;params.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);params.setMargins(dp(4),dp(4),dp(4),dp(4));actions.addView(button,params);}
         actionArea.addView(actions);root.addView(actionArea,new LinearLayout.LayoutParams(-1,-2));updateActions();
         setContentView(root);
+        // Android may consume the first direction key when leaving touch mode.
+        // Route that transition to the same child-friendly area as normal DPAD input.
+        root.getViewTreeObserver().addOnTouchModeChangeListener(touch->{if(!touch)handler.post(()->{
+            if(!active||isFinishing()||isDestroyed()||ended||failureScreen!=null||player==null)return;
+            View focus=getCurrentFocus();if(focus==null||!isInside(focus,actionArea)){playerView.hideController();pauseButton.requestFocus();}
+        });});
     }
     @Override protected void onStart() { super.onStart();active=true;if(!isFinishing()&&playerView!=null){if(online&&!store.allowedCreator(creatorUid)){finish();return;}if(ended)showEndScreen();else prepare();} }
     private void prepare() {

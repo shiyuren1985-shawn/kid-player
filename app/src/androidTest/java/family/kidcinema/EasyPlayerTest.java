@@ -51,6 +51,15 @@ public class EasyPlayerTest {
         main(()->assertFalse(view.isControllerFullyVisible()));device.pressDPadCenter();await(()->!player().getPlayWhenReady(),3000,"Remote pauses from persistent buttons");
         device.pressDPadRight();device.pressDPadCenter();await(()->store.favorite("demo:sample-0"),3000,"Favorite remains accessible immediately after pause");
     }
+    @Test public void shellRemoteAfterTouchKeepsPersistentFocus()throws Exception{
+        startDemo();device.click(500,350);SystemClock.sleep(1500);
+        device.executeShellCommand("input keyevent 20");SystemClock.sleep(300);
+        main(()->assertEquals("After shell DOWN","暂停视频",String.valueOf(activity.getActivity().getCurrentFocus().getContentDescription())));
+        device.executeShellCommand("input keyevent 23");SystemClock.sleep(600);
+        main(()->assertEquals("After shell CENTER","播放视频",String.valueOf(activity.getActivity().getCurrentFocus().getContentDescription())));
+        device.executeShellCommand("input keyevent 22");SystemClock.sleep(300);
+        main(()->assertEquals("After shell RIGHT","收藏视频",String.valueOf(activity.getActivity().getCurrentFocus().getContentDescription())));
+    }
     @Test public void liveEndCardPlaysAnotherApprovedVideoWithoutDialog()throws Exception{
         Assume.assumeTrue("Explicit live opt-in","true".equals(InstrumentationRegistry.getArguments().getString("liveBili")));store.online(true);
         java.util.List<LibraryItem> feed=BiliClient.items(store.feed());LibraryItem current=feed.get(0),next=feed.get(1);
