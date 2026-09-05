@@ -191,8 +191,10 @@ public final class AppStore {
     public void progress(String scope,String key,long ms) {
         prefs.edit().putLong("progress:"+scope+":"+key,Math.max(0,ms)).putLong("watched:"+scope+":"+key,System.currentTimeMillis()).apply();
     }
-    public boolean favorite(String key) {return prefs.getBoolean("favorite:"+scope()+":"+key,false);}
-    public void toggleFavorite(String key) {prefs.edit().putBoolean("favorite:"+scope()+":"+key,!favorite(key)).apply();}
+    public boolean favorite(String key) {return favorite(scope(),key);}
+    public boolean favorite(String scope,String key) {return prefs.getBoolean("favorite:"+scope+":"+key,false);}
+    public void toggleFavorite(String key) {toggleFavorite(scope(),key);}
+    public void toggleFavorite(String scope,String key) {prefs.edit().putBoolean("favorite:"+scope+":"+key,!favorite(scope,key)).apply();}
     public void remember(List<LibraryItem> items) {
         if(online() || demo())return;
         String key="library:"+scope();

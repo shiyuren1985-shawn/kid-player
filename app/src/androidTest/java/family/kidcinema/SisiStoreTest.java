@@ -67,6 +67,15 @@ public class SisiStoreTest {
         BiliClient wrong=new BiliClient(123,path->new JSONObject().put("code",0).put("data",new JSONObject().put("bvid","BV1Yptj6zEEG").put("owner",new JSONObject().put("mid",456))));
         assertThrows(IllegalArgumentException.class,()->wrong.resolve("BV1Yptj6zEEG"));
     }
+    @Test public void endSuggestionsStayWithinAuthorExcludeCurrentAndRecheckDisabled()throws Exception{
+        store.online(true);store.remoteCreators(false);store.addCreator(new AppStore.Creator(123,"测试作者乙","",true));
+        JSONArray rows=new JSONArray();for(int i=1;i<=8;i++)rows.put(new JSONObject().put("bvid",String.format(java.util.Locale.ROOT,"BV%010d",i)).put("uid",123).put("title","乙的影片"+i).put("author","乙").put("published",1700000000+i).put("duration","01:00"));
+        store.feed(123,new JSONObject().put("schema",1).put("uid",123).put("syncedAt",System.currentTimeMillis()).put("videos",rows));
+        store.progress("bili:123","bili:BV0000000008",4000);
+        java.util.List<LibraryItem> next=EndSuggestions.forCreator(store,123,"BV0000000001");assertEquals(4,next.size());assertEquals("BV0000000008",next.get(0).path);
+        for(LibraryItem item:next){assertEquals(123,item.creatorUid);assertNotEquals("BV0000000001",item.path);}
+        store.creatorEnabled(123,false);assertTrue(EndSuggestions.forCreator(store,123,"BV0000000001").isEmpty());
+    }
     @Test public void sourceAndImageUrlsRejectNonHttpsOrUnrelatedImages(){
         assertThrows(IllegalArgumentException.class,()->RemoteConfig.checkedUrl("http://example.com/config.json"));
         assertThrows(IllegalArgumentException.class,()->RemoteConfig.checkedUrl("https://user:secret@example.com/config.json"));

@@ -26,7 +26,8 @@ public class PlaybackRegressionTest {
     private void await(java.util.function.BooleanSupplier condition,long timeout,String message){
         long deadline=SystemClock.elapsedRealtime()+timeout;boolean[] ok={false};
         do{main(()->ok[0]=condition.getAsBoolean());if(ok[0])return;SystemClock.sleep(150);}while(SystemClock.elapsedRealtime()<deadline);
-        fail(message);
+        StringBuilder visible=new StringBuilder();for(androidx.test.uiautomator.UiObject2 label:UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).findObjects(By.clazz("android.widget.TextView")))visible.append(label.getText()).append(" | ");
+        fail(message+"; visible player status: "+visible);
     }
     private Intent intent(boolean online,String id){return new Intent(context(),PlayerActivity.class).putExtra("online",online).putExtra("demo",!online).putExtra("path",id).putExtra("title","播放回归验证");}
     @Test public void pausedPlaybackStaysPausedAfterBackgroundAndReturnsAtPosition() throws Exception {
@@ -41,7 +42,8 @@ public class PlaybackRegressionTest {
         await(()->player().getVideoDecoderCounters()!=null&&player().getVideoDecoderCounters().renderedOutputBufferCount>0,5000,"Paused return did not render a video frame");
         main(()->{assertFalse("Paused video must not autoplay after Home",player().getPlayWhenReady());assertEquals(position[0],player().getCurrentPosition(),200);});
         SystemClock.sleep(3000);
-        main(()->{assertEquals(position[0],player().getCurrentPosition(),200);player().play();});
+        main(()->assertEquals(position[0],player().getCurrentPosition(),200));
+        androidx.test.uiautomator.UiObject2 resume=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).wait(Until.findObject(By.desc("播放视频")),3000);assertNotNull(resume);assertTrue("Persistent resume button enabled after paused background",resume.isEnabled());resume.click();
         await(()->player().getCurrentPosition()>position[0]+800,5000,"Resume did not advance");
     }
     @Test public void transientAudioFocusLossPausesAndGainResumes() throws Exception {

@@ -31,8 +31,6 @@ public class MainActivity extends Activity {
     private int generation=0,renderGeneration=0;
     private Future<?> loadTask;
     private BiliClient syncClient;
-    private AlertDialog videoDetail;
-    private long detailCreator;
     private String playbackReturnFocus="";
     private boolean leftForPlayback;
     private String pendingNavigationFocus="";
@@ -47,7 +45,7 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);store=new AppStore(this);knownCreators=creatorSignature();store.prefs.registerOnSharedPreferenceChangeListener(creatorChanges);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        if(state!=null){folder=state.getString("folder","");section=state.getString("section","全部影片");
+        if(state!=null){folder=state.getString("folder","");section=state.getString("section","全部影片");if(section.equals("我的喜欢"))section="我的收藏";
             Position p=new Position();p.anchor=state.getString("anchor","header");p.focus=state.getString("focus","");p.index=state.getInt("index");p.offset=state.getInt("offset");positions.put(page(),p);}
         refresh(false);
     }
@@ -128,7 +126,7 @@ public class MainActivity extends Activity {
         loadTask=io.submit(()->{RemoteConfig.refresh(store,manual);runOnUiThread(()->{if(isDestroyed()||request!=generation)return;loading=false;items=new ArrayList<>();refreshCreator(manual);});});
     }
     private String creatorSignature(){StringBuilder s=new StringBuilder(Boolean.toString(store.remoteCreators()));for(AppStore.Creator c:store.enabledCreators())s.append(":").append(c.uid);return s.toString();}
-    private void onCreatorsChanged(String key){if(key!=null&&key.startsWith("creators"))handler.post(()->{if(foreground&&store.online()&&!knownCreators.equals(creatorSignature())){capture();cancelLoad();if(videoDetail!=null&&detailCreator>0&&!store.allowedCreator(detailCreator))videoDetail.dismiss();items=new ArrayList<>();refreshCreator(false);}});}
+    private void onCreatorsChanged(String key){if(key!=null&&key.startsWith("creators"))handler.post(()->{if(foreground&&store.online()&&!knownCreators.equals(creatorSignature())){capture();cancelLoad();items=new ArrayList<>();refreshCreator(false);}});}
     private void refreshCreator(boolean manual){
         knownCreators=creatorSignature();long uid=store.selectedCreator();
         if(uid==0){items=new ArrayList<>();error="";render();return;}
@@ -154,9 +152,9 @@ public class MainActivity extends Activity {
         }catch(Exception e){return "目录暂不可用";}
     }
     private List<LibraryItem> filtered(){
-        if(!store.online()&&!store.demo()&&!section.equals("全部影片"))return store.history(section.equals("我的喜欢"));
+        if(!store.online()&&!store.demo()&&!section.equals("全部影片"))return store.history(section.equals("我的收藏"));
         List<LibraryItem> result=new ArrayList<>();for(LibraryItem item:items){
-            if(section.equals("我的喜欢")&&(item.folder||!store.favorite(item.key())))continue;
+            if(section.equals("我的收藏")&&(item.folder||!store.favorite(item.key())))continue;
             if(section.equals("继续观看")&&(item.folder||store.progress(item.key())<=0))continue;result.add(item);
         }return result;
     }
@@ -187,10 +185,10 @@ public class MainActivity extends Activity {
     }
     private void buildNav(){
         nav.removeAllViews();boolean wide=getResources().getConfiguration().screenWidthDp>=780;
-        String[] names={"全部影片","继续观看","我的喜欢"};String[] glyphs={"▦  ","▷  ","♡  "};
+        String[] names={"全部影片","继续观看","我的收藏"};String[] glyphs={"▦  ","▷  ","♡  "};
         for(int i=0;i<names.length;i++){String name=names[i];Button button=button(glyphs[i]+name,section.equals(name),()->section(name));button.setTag("nav:"+name);button.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(wide?-1:dp(150),-2);p.setMargins(0,0,wide?0:dp(8),dp(10));nav.addView(button,p);}
         Button up=button(store.online()?"✓ UP 主订阅":"UP 主订阅",false,this::online);up.setTag("nav:online");nav.addView(up,new LinearLayout.LayoutParams(wide?-1:dp(150),-2));
-        if(wide){space(nav,22);nav.addView(text(store.online()?"只看已选择的作者\n没有推荐与搜索":store.demo()?"●  本地演示\n18 秒静音短片":"家庭存储\n只读指定目录",13,MUTED,false));}
+        if(wide){space(nav,22);nav.addView(text(store.online()?"只看已选择的作者\n按作者挑选影片":store.demo()?"●  本地演示\n18 秒静音短片":"家庭存储\n只读指定目录",13,MUTED,false));}
     }
     private View listHeader(){
         LinearLayout box=column();box.setPadding(dp(2),0,dp(10),dp(12));
@@ -219,7 +217,7 @@ public class MainActivity extends Activity {
                 Button play=button(store.demo()?"▶  播放演示短片":store.progress(item.key())>0?"继续播放":"播放",true,()->play(item,false,"hero"));play.setTag("hero");banner.addView(play);box.addView(banner);
             }
         }
-        if(visible.isEmpty()&&!loading){space(box,14);String message=section.equals("我的喜欢")?"还没有喜欢的影片。打开影片详情，点一下喜欢。":section.equals("继续观看")?"看过的故事，会在这里等你继续。":store.online()?(store.remoteCreators()?"请在云端文件配置作者，再读取名单并更新目录。":"在播放设置添加并启用 UP 主，然后更新目录。"):"这个文件夹还没有影片。";TextView empty=text(message,17,MUTED,false);empty.setPadding(dp(20),dp(24),dp(20),dp(24));empty.setBackground(bg(PANEL,18));box.addView(empty);}
+        if(visible.isEmpty()&&!loading){space(box,14);String message=section.equals("我的收藏")?"还没有收藏的影片。播放时点一下收藏。":section.equals("继续观看")?"看过的故事，会在这里等你继续。":store.online()?(store.remoteCreators()?"请在云端文件配置作者，再读取名单并更新目录。":"在播放设置添加并启用 UP 主，然后更新目录。"):"这个文件夹还没有影片。";TextView empty=text(message,17,MUTED,false);empty.setPadding(dp(20),dp(24),dp(20),dp(24));empty.setBackground(bg(PANEL,18));box.addView(empty);}
         return box;
     }
     private final class Cards extends RecyclerView.Adapter<Cards.Holder>{
@@ -232,25 +230,14 @@ public class MainActivity extends Activity {
     }
     private ImageView picture(String url,int height){ImageView image=new ImageView(this);image.setImageResource(R.drawable.heartsping_foreground);image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);image.setBackground(bg(PANEL,14));image.setClipToOutline(true);image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);image.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(height)));if(!url.isEmpty()){image.setScaleType(ImageView.ScaleType.CENTER_CROP);RemoteImages.load(image,url);}return image;}
     private View card(LibraryItem item){
-        LinearLayout card=column();focusStyle(card,Color.WHITE,18);card.setPadding(dp(5),dp(5),dp(5),dp(12));card.setTag("card:"+item.key());card.setContentDescription(item.name+(item.folder?"，文件夹":"，打开影片详情"));
+        LinearLayout card=column();focusStyle(card,Color.WHITE,18);card.setPadding(dp(5),dp(5),dp(5),dp(12));card.setTag("card:"+item.key());card.setContentDescription(item.name+(item.folder?"，文件夹":"，直接播放"));
         if(item.demo)card.addView(new ArtView(this,item.art),new LinearLayout.LayoutParams(-1,dp(132)));else card.addView(picture(item.image,tv?145:135));
         LinearLayout caption=column();caption.setPadding(dp(10),dp(12),dp(10),0);TextView name=text((item.folder?"文件夹 · ":"")+item.name,tv?20:18,INK,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);caption.addView(name);space(caption,6);
         TextView subtitle=text(item.subtitle,tv?14:13,MUTED,false);subtitle.setMaxLines(2);subtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);caption.addView(subtitle);
-        long progress=store.progress(item.key());if(progress>0){space(caption,5);caption.addView(text("继续 "+time(progress),14,GREEN,true));}if(store.favorite(item.key())){space(caption,5);caption.addView(text("♥  已喜欢",14,GREEN,true));}card.addView(caption);
-        card.setOnClickListener(v->{capture();Position p=positions.get(page());if(p!=null)p.focus="card:"+item.key();if(item.folder){cancelLoad();folder=item.path;items=new ArrayList<>();refresh(false);}else detail(item);});return card;
+        long progress=store.progress(item.key());if(progress>0){space(caption,5);caption.addView(text("继续 "+time(progress),14,GREEN,true));}if(store.favorite(item.key())){space(caption,5);caption.addView(text("♥  已收藏",14,GREEN,true));}card.addView(caption);
+        card.setOnClickListener(v->{capture();Position p=positions.get(page());if(p!=null)p.focus="card:"+item.key();if(item.folder){cancelLoad();folder=item.path;items=new ArrayList<>();refresh(false);}else play(item,false);});return card;
     }
     static String time(long ms){long seconds=ms/1000;return String.format(Locale.CHINA,"%02d:%02d",seconds/60,seconds%60);}
-    private void detail(LibraryItem item){
-        ScrollView scroll=new ScrollView(this);LinearLayout panel=column();panel.setPadding(dp(22),dp(10),dp(22),dp(16));scroll.addView(panel);panel.addView(picture(item.image,150));space(panel,12);
-        panel.addView(text(item.demo?"四张卡片共用 18 秒静音演示短片。":item.subtitle,15,MUTED,false));
-        if(item.online){space(panel,8);panel.addView(text("只播放此作者公开内容。多分 P 视频暂只播放第一 P。",13,MUTED,false));}
-        long progress=store.progress(item.key());if(progress>0){space(panel,10);panel.addView(text("上次看到 "+time(progress),15,GREEN,true));}
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(item.name).setView(scroll).setPositiveButton(progress>0?"继续播放":"播放",(d,w)->play(item,false)).setNegativeButton("返回",null).create();
-        space(panel,12);Button favorite=button(store.favorite(item.key())?"取消喜欢":"♡ 喜欢",false,()->{});favorite.setOnClickListener(v->{store.remember(Collections.singletonList(item));store.toggleFavorite(item.key());favorite.setText(store.favorite(item.key())?"取消喜欢":"♡ 喜欢");favorite.announceForAccessibility(store.favorite(item.key())?"已喜欢":"已取消喜欢");});panel.addView(favorite);
-        if(progress>0){space(panel,8);panel.addView(button("从头播放",false,()->{dialog.dismiss();play(item,true);}));}
-        videoDetail=dialog;detailCreator=item.online?item.creatorUid:0;
-        dialog.setOnDismissListener(d->{if(videoDetail==dialog){videoDetail=null;detailCreator=0;}if(!isDestroyed())render();});dialog.show();if(tv){focusStyle(dialog.getButton(-1),PANEL,12);focusStyle(dialog.getButton(-2),PANEL,12);dialog.getButton(-1).requestFocus();}
-    }
     private void play(LibraryItem item,boolean fromStart){play(item,fromStart,"card:"+item.key());}
     private void play(LibraryItem item,boolean fromStart,String returnFocus){
         if(item.folder)return;playbackReturnFocus=tv?returnFocus:"";leftForPlayback=false;capture();store.remember(Collections.singletonList(item));
@@ -324,7 +311,7 @@ public class MainActivity extends Activity {
         TextView demo=text("本地演示为同一段 18 秒静音短片。",14,MUTED,false);panel.addView(demo);
         Runnable display=()->{int value=sources.getCheckedRadioButtonId();onlinePanel.setVisibility(value==R.id.source_online?View.VISIBLE:View.GONE);smbPanel.setVisibility(value==R.id.source_smb?View.VISIBLE:View.GONE);demo.setVisibility(value==R.id.source_demo?View.VISIBLE:View.GONE);};sources.setOnCheckedChangeListener((g,id)->display.run());display.run();
         space(panel,18);panel.addView(text("界面模式",16,INK,true));Spinner modes=new Spinner(this);String[] names={"自动","平板","电视"};modes.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));modes.setSelection(Math.max(0,Arrays.asList(names).indexOf(store.mode())));modes.setContentDescription("界面模式");panel.addView(modes,new LinearLayout.LayoutParams(-1,dp(56)));
-        space(panel,10);panel.addView(text("思思影院 0.4.0 · 家庭自用原型",13,MUTED,false));
+        space(panel,10);panel.addView(text("思思影院 0.5.0 · 家庭自用原型",13,MUTED,false));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("播放设置").setView(scroll).setPositiveButton("保存",null).setNegativeButton("取消",null).create();
         dialog.setOnDismissListener(d->{if(testing[0]!=null)testing[0].cancel(true);if(!isDestroyed())render();});dialog.show();dialog.getWindow().setLayout(Math.min(dp(650),getResources().getDisplayMetrics().widthPixels-dp(32)),(int)(getResources().getDisplayMetrics().heightPixels*.88));
         dialog.getButton(-1).setOnClickListener(v->{int source=sources.getCheckedRadioButtonId();try{

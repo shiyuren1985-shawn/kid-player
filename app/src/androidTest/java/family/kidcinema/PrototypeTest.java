@@ -49,11 +49,11 @@ public class PrototypeTest {
         click(device,By.text("▷  继续观看"));
         assertNotNull(device.wait(Until.findObject(By.text("小火箭去旅行")),5000));
         click(device,By.text("小火箭去旅行"));
-        click(device,By.text("♡ 喜欢"));
-        click(device,By.text("返回"));
-        assertTrue(device.wait(Until.hasObject(By.text("♥  已喜欢")),5000));
+        click(device,By.desc("收藏视频"));
+        click(device,By.desc("返回视频列表"));
+        assertTrue(device.wait(Until.hasObject(By.text("♥  已收藏")),5000));
         assertTrue(store.favorite("demo:sample-0"));
-        click(device,By.text("♡  我的喜欢"));
+        click(device,By.text("♡  我的收藏"));
         assertNotNull(device.wait(Until.findObject(By.text("小火箭去旅行")),3000));
         click(device,By.desc("播放设置"));
         assertFalse(device.hasObject(By.text("家长验证")));

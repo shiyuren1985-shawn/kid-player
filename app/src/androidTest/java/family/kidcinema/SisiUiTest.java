@@ -22,12 +22,15 @@ public class SisiUiTest {
     @Test public void automaticLaunchDoesNotUseManualOneMinuteCooldown()throws Exception{
         long attempt=store.syncAttempt();Thread.sleep(500);assertEquals(attempt,store.syncAttempt());assertTrue(System.currentTimeMillis()-attempt>110000);
     }
-    @Test public void lateCardFavoriteStaysOpenAndReturnKeepsPosition()throws Exception{
+    @Test public void lateCardDirectlyOpensPlayerAndReturnKeepsPosition()throws Exception{
         UiScrollable scroll=new UiScrollable(new UiSelector().description("影片列表"));assertTrue(scroll.scrollIntoView(new UiSelector().text("测试影片 18")));
-        click(By.desc("测试影片 18，打开影片详情"));click(By.text("♡ 喜欢"));
-        assertNotNull(device.findObject(By.text("取消喜欢")));assertNotNull(device.findObject(By.text("返回")));
-        click(By.text("返回"));assertTrue(device.wait(Until.hasObject(By.text("测试影片 18")),3000));assertTrue(store.favorite("bili:BV0000000018"));
-        UiObject2 focus=device.wait(Until.findObject(By.pkg("family.kidcinema").focused(true).desc("测试影片 18，打开影片详情")),3000);assertNotNull("TV returns to original focus",focus);assertEquals("测试影片 18，打开影片详情",focus.getContentDescription());
+        click(By.desc("测试影片 18，直接播放"));
+        boolean[] playingActivity={false};long deadline=System.currentTimeMillis()+4000;
+        while(!playingActivity[0]&&System.currentTimeMillis()<deadline){InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+            for(android.app.Activity a:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED))if(a instanceof PlayerActivity)playingActivity[0]=true;
+        });Thread.sleep(100);}
+        assertTrue("One card click opens the player without a details confirmation",playingActivity[0]);device.pressBack();
+        assertNotNull(device.wait(Until.findObject(By.pkg("family.kidcinema").focused(true).desc("测试影片 18，直接播放")),4000));
     }
     @Test public void tvDownFromSettingsEntersCatalogAndGridMoves()throws Exception{
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
@@ -38,26 +41,24 @@ public class SisiUiTest {
         assertNotNull("Arrange physical remote focus on settings",device.wait(Until.findObject(By.pkg("family.kidcinema").focused(true).desc("播放设置")),3000));
         // Real remote cadence gives Android time to attach the next recycled row.
         for(int i=0;i<7;i++){device.pressDPadDown();Thread.sleep(150);}
-        UiObject2 first=device.wait(Until.findObject(By.pkg("family.kidcinema").focused(true).descContains("打开影片详情")),3000);
+        UiObject2 first=device.wait(Until.findObject(By.pkg("family.kidcinema").focused(true).descContains("直接播放")),3000);
         assertNotNull("DPAD down must transfer input from settings into video cards",first);String old=first.getContentDescription();
         device.pressDPadRight();Thread.sleep(150);device.pressDPadDown();
-        UiObject2 next=device.wait(Until.findObject(By.pkg("family.kidcinema").focused(true).descContains("打开影片详情")),3000);
+        UiObject2 next=device.wait(Until.findObject(By.pkg("family.kidcinema").focused(true).descContains("直接播放")),3000);
         assertNotNull(next);assertNotEquals(old,next.getContentDescription());
     }
     @Test public void demoPlaybackReturnsFocusToChosenCard()throws Exception{
         store.demo(true);Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();
         c.startActivity(c.getPackageManager().getLaunchIntentForPackage(c.getPackageName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
-        click(By.desc("森林里的小秘密，打开影片详情"));click(By.text("播放"));
+        click(By.desc("森林里的小秘密，直接播放"));
         long deadline=System.currentTimeMillis()+15000;while(store.progress("demo:sample-1")<500&&System.currentTimeMillis()<deadline)Thread.sleep(200);
         assertTrue("Video must actually advance before returning",store.progress("demo:sample-1")>=500);
         device.pressBack();
-        assertNotNull("Playback return must restore selected card, not settings",device.wait(Until.findObject(By.pkg("family.kidcinema").focused(true).desc("森林里的小秘密，打开影片详情")),4000));
+        assertNotNull("Playback return must restore selected card, not settings",device.wait(Until.findObject(By.pkg("family.kidcinema").focused(true).desc("森林里的小秘密，直接播放")),4000));
     }
     @Test public void cloudRevocationUpdatesVisibleCatalogWithoutRestart()throws Exception{
         assertTrue(device.wait(Until.hasObject(By.text("测试影片 1")),3000));
-        click(By.desc("测试影片 1，打开影片详情"));assertNotNull(device.findObject(By.text("♡ 喜欢")));
         store.applyRemoteCreators("https://example.invalid/creators.json",java.util.Collections.emptyList());
-        assertTrue(device.wait(Until.gone(By.text("♡ 喜欢")),3000));
         assertTrue(device.wait(Until.gone(By.text("测试影片 1")),3000));
         assertEquals(0,store.selectedCreator());
         assertTrue(device.wait(Until.hasObject(By.textContains("请在云端文件配置作者")),3000));
