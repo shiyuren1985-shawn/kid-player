@@ -116,6 +116,8 @@ public class MainActivity extends Activity {
     }
     private void refreshOnline(boolean manual){
         if(loading)return;
+        // Show the saved catalogue even while the remote creator list is being checked.
+        if(items.isEmpty()&&store.selectedCreator()>0){try{items=BiliClient.items(store.feed(),store.selectedCreator());}catch(Exception ignored){}}
         if(store.remoteCreators() && !store.remoteUrl().isEmpty() && (manual||RemoteConfig.due(store))) {
             refreshManifest(manual);return;
         }
@@ -187,7 +189,7 @@ public class MainActivity extends Activity {
         nav.removeAllViews();boolean wide=getResources().getConfiguration().screenWidthDp>=780;
         String[] names={"全部影片","继续观看","我的收藏"};String[] glyphs={"▦  ","▷  ","♡  "};
         for(int i=0;i<names.length;i++){String name=names[i];Button button=button(glyphs[i]+name,section.equals(name),()->section(name));button.setTag("nav:"+name);button.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(wide?-1:dp(150),-2);p.setMargins(0,0,wide?0:dp(8),dp(10));nav.addView(button,p);}
-        Button up=button(store.online()?"✓ UP 主订阅":"UP 主订阅",false,this::online);up.setTag("nav:online");nav.addView(up,new LinearLayout.LayoutParams(wide?-1:dp(150),-2));
+        Button up=button(store.online()?"管理 UP 主":"UP 主视频",false,()->{if(store.online())manageCreators();else online();});up.setTag("nav:online");nav.addView(up,new LinearLayout.LayoutParams(wide?-1:dp(150),-2));
         if(wide){space(nav,22);nav.addView(text(store.online()?"只看已选择的作者\n按作者挑选影片":store.demo()?"●  本地演示\n18 秒静音短片":"家庭存储\n只读指定目录",13,MUTED,false));}
     }
     private View listHeader(){
@@ -205,6 +207,7 @@ public class MainActivity extends Activity {
         if(section.equals("全部影片")){if(store.online()){AppStore.Creator c=store.creator(store.selectedCreator());title=c==null?"我的 UP 主":c.name+"的视频";}else if(!folder.isEmpty())title=folder.substring(folder.lastIndexOf('/')+1);}
         titleRow.addView(text(title,tv?24:22,INK,true),new LinearLayout.LayoutParams(0,-2,1));
         if(!folder.isEmpty() && section.equals("全部影片"))titleRow.addView(button("‹ 上一层",false,this::up));
+        if(loading){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setTag("sync:progress");spinner.setContentDescription("正在更新目录");spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(GREEN));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(24),dp(24));sp.setMargins(0,0,dp(10),0);titleRow.addView(spinner,sp);}
         Button refresh=button(loading?"更新中":"刷新",false,this::refresh);refresh.setTag("refresh");refresh.setEnabled(!loading);titleRow.addView(refresh);box.addView(titleRow);space(box,6);
         box.addView(text(store.online()?onlineStatus():store.demo()?"4 种封面 · 共用 1 段 18 秒静音演示片":section.equals("全部影片")?"当前文件夹 · 可进入子文件夹":"允许目录内的全部"+section,13,MUTED,false));
         if(store.online()){space(box,6);box.addView(text("公开合集最新 30 条；未加入合集的投稿可能遗漏。",13,MUTED,false));if(store.remoteCreators()&&!store.prefs.getString("remote.error","").isEmpty())box.addView(text("云端名单更新未完成，保留上次名单。",13,ERROR,false));}
@@ -284,7 +287,7 @@ public class MainActivity extends Activity {
     private void settings(){
         AppStore.Config previous;try{previous=store.config();}catch(Exception e){previous=new AppStore.Config();}
         ScrollView scroll=new ScrollView(this);LinearLayout panel=column();panel.setPadding(dp(22),dp(12),dp(22),dp(18));scroll.addView(panel);
-        panel.addView(text("内容来源",17,INK,true));RadioGroup sources=new RadioGroup(this);String[] sourceNames={"UP 主订阅","家庭存储","本地演示"};
+        panel.addView(text("内容来源",17,INK,true));RadioGroup sources=new RadioGroup(this);String[] sourceNames={"UP 主视频","家庭存储","本地演示"};
         int[] sourceIds={R.id.source_online,R.id.source_smb,R.id.source_demo};
         for(int i=0;i<sourceNames.length;i++){RadioButton radio=new RadioButton(this);radio.setId(sourceIds[i]);radio.setText(sourceNames[i]);radio.setTextSize(16);radio.setMinHeight(dp(52));sources.addView(radio);}sources.check(store.online()?R.id.source_online:store.demo()?R.id.source_demo:R.id.source_smb);panel.addView(sources);
         LinearLayout onlinePanel=column();onlinePanel.addView(text("点击头像分类观看。每位作者独立更新公开合集最新 30 条，未加入合集的投稿可能遗漏。",14,MUTED,false));space(onlinePanel,10);onlinePanel.addView(button("管理 UP 主名单",false,this::manageCreators));panel.addView(onlinePanel);
@@ -323,7 +326,7 @@ public class MainActivity extends Activity {
     private void invalid(EditText field,String message){field.setError(message);field.requestFocus();field.requestRectangleOnScreen(new android.graphics.Rect(0,0,field.getWidth(),field.getHeight()),false);}
     private void manageCreators(){
         ScrollView scroll=new ScrollView(this);LinearLayout panel=column();panel.setPadding(dp(22),dp(14),dp(22),dp(18));scroll.addView(panel);
-        RadioGroup source=new RadioGroup(this);RadioButton remote=new RadioButton(this);remote.setId(R.id.creators_cloud);remote.setText("云端名单（推荐）");remote.setMinHeight(dp(52));source.addView(remote);RadioButton local=new RadioButton(this);local.setId(R.id.creators_local);local.setText("本机管理");local.setMinHeight(dp(52));source.addView(local);source.check(store.remoteCreators()?R.id.creators_cloud:R.id.creators_local);panel.addView(source);panel.addView(text("名单改动立即生效，独立于外层播放设置的保存。",13,MUTED,false));
+        RadioGroup source=new RadioGroup(this);RadioButton remote=new RadioButton(this);remote.setId(R.id.creators_cloud);remote.setText("云端名单（推荐）");remote.setMinHeight(dp(52));source.addView(remote);RadioButton local=new RadioButton(this);local.setId(R.id.creators_local);local.setText("本机管理");local.setMinHeight(dp(52));source.addView(local);source.check(store.remoteCreators()?R.id.creators_cloud:R.id.creators_local);panel.addView(source);panel.addView(text("名单改动立即生效。启用的 UP 主会显示在首页；关闭后隐藏，收藏和观看记录仍保留。",13,MUTED,false));
         LinearLayout cloud=column();panel.addView(cloud);cloud.addView(text("在你自己的 HTTPS JSON 文件中设置 UID，App 自动读取。此模式下不能在 App 内增删作者。",15,MUTED,false));space(cloud,12);
         EditText url=field(cloud,"云端名单地址",store.remoteUrl(),"HTTPS JSON 文件地址",false);url.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);
         TextView status=text(remoteSummary(),14,MUTED,false);cloud.addView(status);space(cloud,10);Button fetch=button("读取并使用云端名单",true,()->{});cloud.addView(fetch);

@@ -19,6 +19,38 @@ public class KidPlayerUiTest {
     }
     @After public void after(){device.pressHome();store.prefs.edit().clear().commit();}
     private void click(BySelector selector){UiObject2 v=device.wait(Until.findObject(selector),5000);assertNotNull(selector.toString(),v);v.click();}
+    @Test public void manageCreatorsOpensListWithoutChangingSelection()throws Exception{
+        long selected=store.selectedCreator();
+        int count=store.enabledCreators().size();
+        click(By.text("管理 UP 主"));
+        assertTrue(device.wait(Until.hasObject(By.text("UP 主名单来源")),3000));
+        assertEquals(selected,store.selectedCreator());assertEquals(count,store.enabledCreators().size());
+        click(By.text("完成"));
+        assertTrue(device.wait(Until.hasObject(By.text("测试影片 1")),3000));
+    }
+    @Test public void progressIndicatorTracksLoadingWhileCachedCardsRemain()throws Exception{
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+            for(android.app.Activity activity:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED))if(activity instanceof MainActivity){
+                try{
+                    java.lang.reflect.Field loading=MainActivity.class.getDeclaredField("loading");loading.setAccessible(true);
+                    java.lang.reflect.Method render=MainActivity.class.getDeclaredMethod("render");render.setAccessible(true);
+                    loading.setBoolean(activity,true);render.invoke(activity);
+                }catch(Exception e){throw new AssertionError(e);}
+            }
+        });
+        assertTrue(device.wait(Until.hasObject(By.desc("正在更新目录")),3000));
+        assertTrue(device.hasObject(By.text("测试影片 1")));
+        assertFalse(device.findObject(By.text("更新中")).isEnabled());
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+            for(android.app.Activity activity:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED))if(activity instanceof MainActivity){
+                try{java.lang.reflect.Method cancel=MainActivity.class.getDeclaredMethod("cancelLoad");cancel.setAccessible(true);cancel.invoke(activity);
+                    java.lang.reflect.Method render=MainActivity.class.getDeclaredMethod("render");render.setAccessible(true);render.invoke(activity);
+                }catch(Exception e){throw new AssertionError(e);}
+            }
+        });
+        assertTrue(device.wait(Until.gone(By.desc("正在更新目录")),3000));
+        assertTrue(device.findObject(By.text("刷新")).isEnabled());
+    }
     @Test public void automaticLaunchDoesNotUseManualOneMinuteCooldown()throws Exception{
         long attempt=store.syncAttempt();Thread.sleep(500);assertEquals(attempt,store.syncAttempt());assertTrue(System.currentTimeMillis()-attempt>110000);
     }

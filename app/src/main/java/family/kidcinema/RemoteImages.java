@@ -10,7 +10,6 @@ import android.widget.ImageView;
 import java.io.*;
 import java.net.*;
 import java.lang.ref.WeakReference;
-import java.security.MessageDigest;
 import java.util.concurrent.*;
 
 /** Bounded, optional image cache. Only platform image hosts, including redirects. */
@@ -39,11 +38,19 @@ final class RemoteImages {
         });
     }
     private static byte[] bytes(Context context,String source) throws Exception {
-        File directory=new File(context.getCacheDir(),"creator-images");directory.mkdirs();
-        byte[] digest=MessageDigest.getInstance("SHA-256").digest(source.getBytes(java.nio.charset.StandardCharsets.UTF_8));StringBuilder key=new StringBuilder();
-        for(byte b:digest)key.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
-        File file=new File(directory,key.toString());
-        if(file.isFile() && file.length()<=2_000_000 && System.currentTimeMillis()-file.lastModified()<7*86400000L)return java.nio.file.Files.readAllBytes(file.toPath());
+        return new ImageDiskCache(new File(context.getCacheDir(),"creator-images"),24_000_000,2_000_000)
+            .get(source,()->download(source),RemoteImages::validImage);
+    }
+    private static boolean validImage(byte[] data){
+        BitmapFactory.Options size=new BitmapFactory.Options();size.inJustDecodeBounds=true;
+        BitmapFactory.decodeByteArray(data,0,data.length,size);
+        if(size.outWidth<=0||size.outHeight<=0||size.outWidth>16000||size.outHeight>16000)return false;
+        BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=1;
+        while(size.outWidth/options.inSampleSize>800||size.outHeight/options.inSampleSize>800)options.inSampleSize*=2;
+        Bitmap decoded=BitmapFactory.decodeByteArray(data,0,data.length,options);
+        if(decoded==null)return false;decoded.recycle();return true;
+    }
+    private static byte[] download(String source)throws Exception {
         String url=BiliPolicy.imageUrl(source);
         for(int i=0;i<4;i++) {
             HttpURLConnection connection=(HttpURLConnection)new URL(BiliPolicy.imageUrl(url)).openConnection();
@@ -55,19 +62,10 @@ final class RemoteImages {
                 String type=connection.getContentType();if(type==null || !type.toLowerCase(java.util.Locale.ROOT).startsWith("image/"))throw new IOException();
                 try(InputStream in=connection.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()) {
                     byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1){if(out.size()+n>2_000_000)throw new IOException();out.write(buffer,0,n);}
-                    byte[] data=out.toByteArray();trim(directory);
-                    File temporary=File.createTempFile("image-",".tmp",directory);
-                    try{java.nio.file.Files.write(temporary.toPath(),data);java.nio.file.Files.move(temporary.toPath(),file.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);}finally{temporary.delete();}
-                    return data;
+                    return out.toByteArray();
                 }
             }finally{connection.disconnect();}
         }
         throw new IOException();
-    }
-    private static synchronized void trim(File directory) {
-        File[] files=directory.listFiles();if(files==null)return;
-        java.util.Arrays.sort(files,java.util.Comparator.comparingLong(File::lastModified));long size=0;
-        for(File file:files)size+=file.length();
-        for(File file:files){if(size<24_000_000)break;long length=file.length();if(file.delete())size-=length;}
     }
 }

@@ -1,6 +1,6 @@
 # kid player 应用更新
 
-当前开发版本 0.6.0 / versionCode 9。默认更新清单：
+当前开发版本 0.6.1 / versionCode 10。默认更新清单：
 
 `https://kid-player.shiyu.ren/kid-player/update.json`
 
@@ -26,7 +26,7 @@ bash tools/publish-update.sh --notes '本次更新说明'
 
 脚本先构建并执行单元测试、lint，然后验证 APK 签名和身份，复制版本化 APK 至独立公开目录，最后原子替换 `update.json`。拒绝降版本、同 versionCode 替换不同字节及改变签名，避免平板拿到半个文件或错包。已有 APK 永不覆盖。发布前后的清单和 SHA 应留在相应本机 QA 记录。UI 改动的仪器/视觉验证须另外完成，发布脚本不会替代这些检查。
 
-默认目录：`/Volumes/ZHITAI/AI/KidPlayer/update-server/public/kid-player/`。当前下载路径为 `/kid-player/releases/kid-player-0.6.0-9.apk`。`tools/package.sh` 仅导出本地 APK，不发布清单。
+默认目录：`/Volumes/ZHITAI/AI/KidPlayer/update-server/public/kid-player/`。当前下载路径为 `/kid-player/releases/kid-player-0.6.1-10.apk`。`tools/package.sh` 仅导出本地 APK，不发布清单。
 
 ## 服务与来源迁移
 
