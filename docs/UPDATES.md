@@ -30,7 +30,7 @@ bash tools/publish-update.sh --notes '本次更新说明'
 
 ## 服务与来源迁移
 
-`kid-player.shiyu.ren → Cloudflare Named Tunnel → 127.0.0.1:18897`，服务是 `tools/update-server.py`，只开放清单和版本化 APK，不提供目录索引或源码。清单返回 `Cache-Control: no-store`，APK 返回一年 immutable 缓存和 `nosniff`。更新期间电脑、外置盘和 Tunnel 必须在线；电脑关机时平板现有版本仍可用，更新检查失败可重试。
+`kid-player.shiyu.ren → Cloudflare Named Tunnel → 127.0.0.1:18897`，服务是 `tools/update-server.py`，只开放清单和版本化 APK，不提供目录索引或源码。清单返回 `Cache-Control: no-store`，APK 返回一年 immutable 缓存和 `nosniff`。下载已发布版本时电脑、用户登录会话和 Tunnel 必须在线；开发和发布新版本时还需外置盘在线；电脑关机时平板现有版本仍可用，更新检查失败可重试。
 
 手动前台启动：
 
@@ -38,7 +38,15 @@ bash tools/publish-update.sh --notes '本次更新说明'
 bash tools/start-update-server.sh
 ```
 
-自动启动部署状态见本次验证记录。源码、APK、日志、下载与缓存均在外置盘；系统启动项如需内置盘，由用户另行同意。
+2026-09-08 按用户修复 502 的请求部署单一 LaunchAgent `ren.shiyu.kid-player.update-server`，登录后启动、退出后由 launchd 自动拉起。安装/更新：
+
+```bash
+python3 tools/install-update-service.py
+```
+
+macOS 拒绝 launchd 直接访问外置盘脚本，因此运行副本位于 `~/Library/Application Support/KidPlayer/UpdateService`，日志位于 `~/Library/Logs/KidPlayer`；源码和原始发布目录仍在外置盘。服务副本仅含服务器脚本、公开清单和发布 APK，不复制源码或凭据。`publish-update.py` 在安装了服务时自动同步新版本：共用发布锁，先核对 APK 长度/SHA256，再复制不可变 APK，最后原子替换清单。此前已分发的 APK 副本保留以支持进行中的下载。服务脚本改变后重跑安装命令。
+
+运行 LaunchAgent 时不要另外启动前台服务占用 18897。诊断使用 `launchctl print gui/$(id -u)/ren.shiyu.kid-player.update-server` 和公网清单回读。2026-09-08 验证见 `docs/UPDATE-SERVICE-20260908.md`。
 
 未来可将相同清单和 APK 放到其它 HTTPS 服务。在更新页“更新源设置”修改完整清单地址即可；也可保留当前域名并迁移后端，让已装设备无须改配置。允许 HTTPS 重定向，每一跳拒绝降级到 HTTP。GitHub 未来可用公开分发仓库/公开资产或受控代理；当前私人源码仓库的下载需要认证，不能直接把私有 Release 地址当作匿名更新源，也不得把 GitHub token 放进 APK 或公开清单。
 

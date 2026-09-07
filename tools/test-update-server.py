@@ -51,4 +51,31 @@ class PublishTest(unittest.TestCase):
     def test_rejects_non_https_origin(self):
         with self.assertRaises(ValueError):publisher.publish(pathlib.Path('absent'),pathlib.Path('absent'),'http://example.com','notes',os.environ['ANDROID_HOME'])
 
+class ServiceMirrorTest(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory(dir=ROOT/'qa')
+        self.base=pathlib.Path(self.temp.name)
+        self.module=load('service_files','update_service_files.py')
+        self.module.SERVICE_HOME=self.base/'service'
+        self.public=self.base/'public'
+        self.folder=self.public/'kid-player/releases';self.folder.mkdir(parents=True)
+        self.apk=self.folder/'kid-player-test-14.apk';self.apk.write_bytes(b'verified-apk')
+        import hashlib
+        self.manifest=self.folder.parent/'update.json'
+        self.manifest.write_text(json.dumps({'apkUrl':'https://example.com/kid-player-test-14.apk','size':self.apk.stat().st_size,'sha256':hashlib.sha256(self.apk.read_bytes()).hexdigest()}))
+    def tearDown(self):self.temp.cleanup()
+    def test_idempotent_and_only_public_release_is_mirrored(self):
+        (self.public/'secret.txt').write_text('private')
+        self.module.mirror(self.public);self.module.mirror(self.public)
+        dest=self.module.SERVICE_HOME/'public'
+        self.assertEqual((dest/'kid-player/update.json').read_bytes(),self.manifest.read_bytes())
+        self.assertEqual((dest/'kid-player/releases'/self.apk.name).read_bytes(),b'verified-apk')
+        self.assertFalse((dest/'secret.txt').exists())
+    def test_bad_apk_does_not_replace_good_manifest(self):
+        self.module.mirror(self.public)
+        dest=self.module.SERVICE_HOME/'public/kid-player/update.json';before=dest.read_bytes()
+        self.apk.write_bytes(b'corrupt')
+        with self.assertRaises(ValueError):self.module.mirror(self.public)
+        self.assertEqual(dest.read_bytes(),before)
+
 if __name__=='__main__':unittest.main()

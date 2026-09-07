@@ -48,4 +48,7 @@ def publish(apk, root, base, notes, sdk):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--apk',required=True,type=pathlib.Path);p.add_argument('--root',type=pathlib.Path,default=pathlib.Path(__file__).resolve().parents[2]/'update-server/public');p.add_argument('--base-url',default='https://kid-player.shiyu.ren');p.add_argument('--notes',required=True);a=p.parse_args()
-    print(json.dumps(publish(a.apk.resolve(),a.root.resolve(),a.base_url,a.notes,os.environ['ANDROID_HOME']),ensure_ascii=False,indent=2))
+    document=publish(a.apk.resolve(),a.root.resolve(),a.base_url,a.notes,os.environ['ANDROID_HOME'])
+    from update_service_files import SERVICE_HOME, mirror
+    if SERVICE_HOME.exists():mirror(a.root.resolve())
+    print(json.dumps(document,ensure_ascii=False,indent=2))
