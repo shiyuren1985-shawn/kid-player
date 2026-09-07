@@ -4,7 +4,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 source "$PROJECT_DIR/tools/env.sh"
 cd "$PROJECT_DIR"
 ./gradlew assembleDebug
-VERSION=$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)
+VERSION=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p")
 test -n "$VERSION"
 mkdir -p output/releases
 DEST="output/releases/kid-player-${VERSION}-debug.apk"

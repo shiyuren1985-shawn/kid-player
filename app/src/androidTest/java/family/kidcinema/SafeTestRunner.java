@@ -10,6 +10,7 @@ public final class SafeTestRunner extends AndroidJUnitRunner {
             ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] buffer=new byte[256];int n;while((n=in.read(buffer))!=-1)out.write(buffer,0,n);
             if(!"KidCinema_Tablet_12".equals(out.toString("UTF-8").trim()))throw new SecurityException("Tests are restricted to KidCinema_Tablet_12");
         }catch(IOException e){throw new SecurityException("Could not verify dedicated emulator",e);}
+        AppUpdater.testing=true;
         super.onStart();
     }
 }

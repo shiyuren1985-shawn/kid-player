@@ -9,4 +9,4 @@
 
 - 显示名称为精确小写 `kid player`，仓库与新产物 slug 为 `kid-player`。保持 `applicationId=family.kidcinema`、存储键及签名兼容性；历史 ZIP/APK/QA 原名原 SHA 保留。
 - Mini 源码位于 `/Volumes/ZHITAI/AI/KidPlayer/kid-player`，新增环境和缓存默认位于相邻外置盘 `runtime`；先 source tools/env.sh，不提交本机凭据和签名文件。
-- 未来路径为 `/kid-player/update.json`、`/kid-player/releases/kid-player-<version>.apk`、`/kid-player/creators.json`，域名待用户提供；更名授权不包含实现更新或部署。
+- 用户已授权应用内更新和本机经 Cloudflare 分发。当前清单 `https://kid-player.shiyu.ren/kid-player/update.json`，服务仅监听127.0.0.1:18897，公开目录在外置盘独立 update-server/public，不能暴露源码或凭据。发布前完成相关验证，版本号递增、签名不变、APK先到位再原子切换清单；不卸载清数据冒充升级。未来可迁移HTTPS更新源，不能在APK里放私人GitHub token。

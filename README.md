@@ -4,6 +4,14 @@
 
 用于观看家长指定范围的视频。一个 APK 包含触控平板布局与电视遥控器布局，保留本地演示与 SMB，并新增实验性 B 站指定 UP 主订阅。
 
+## 0.6 应用内更新（2026-09-07）
+
+当前版本 `0.6.0` / versionCode 9。更新源为 [kid-player.shiyu.ren](https://kid-player.shiyu.ren/kid-player/update.json)，经 Cloudflare Tunnel 连接 Mac Mini 外置盘的只读发布目录。
+
+首页自动检查新版本，后台约15分钟申请检查并在允许通知时提示；系统可能延后。也可在“播放设置 → 检查应用更新”手动检查。支持版本说明、下载进度、取消重试、大小/SHA256/包名/版本/签名校验及系统安装授权，播放中不弹更新提示。本版仍需用户确认安装，不承诺静默更新。首次装入兼容签名的更新版后，后续无需电脑手工拷贝 APK。
+
+电脑发布：增加版本号，完成相关验证后运行 `bash tools/publish-update.sh --notes '更新说明'`。脚本先放版本化 APK，再原子切换清单。完整使用、签名限制、服务和未来 GitHub 来源迁移见 [应用更新说明](docs/UPDATES.md)。
+
 ## 0.5 点开就播与常驻按钮区（2026-09-05）
 
 点影片卡片直接进入播放，移除播放前的详情确认弹窗。视频下方常驻按钮区包含“返回列表、播放/暂停、收藏、关闭影院”，按钮最小高度 72dp；“关闭影院”停止播放并退出当前 App 任务，“返回列表”回到原来的浏览位置。按钮区独立于画面，不随视频控制器自动隐藏。窄屏使用两列按钮，宽屏使用四列；焦点使用深紫边框。
@@ -12,7 +20,7 @@
 
 网络/解码错误显示在视频区域，常驻按钮仍可使用。播放中收藏立即保存，回列表后可在“我的收藏”找到。云端名单、公开合集最新 30 条范围、原有数据和无 PIN 设定延续 0.4。
 
-当前版本 `0.5.0-easy-player` / versionCode 6。操作参考了 YouTube 的[片尾视频选择与自动播放说明](https://support.google.com/youtube/answer/6327615?hl=en-GB)，本应用采用手动选择同作者影片。
+当时版本 `0.5.0-easy-player` / versionCode 6。操作参考了 YouTube 的[片尾视频选择与自动播放说明](https://support.google.com/youtube/answer/6327615?hl=en-GB)，本应用采用手动选择同作者影片。
 
 Air 历史验证（不代表 Mini 本次验收）：13 项单元测试通过；完整模拟器回归 49 项中 47 项通过、2 项在线首播超时，这两项随后在同一 APK 上单独重测通过。遥控器暂停后的焦点、真实同作者切换、三部视频的音视频解码/跳转/暂停恢复、离线重试和 SMB 均有通过记录。在线首播偶发超时的根因尚未确认。检查记录见 `qa/sisi-0.5.0/development-review.md`、`verification.json` 和 `visual-review.md`；APK 保存在 `qa/releases/0.5.0-easy-player/`。
 
@@ -32,7 +40,7 @@ Air 历史验证（不代表 Mini 本次验收）：13 项单元测试通过；�
 - 当时调试版本 `0.4.0-sisi` / versionCode 5，沿用包名和调试签名以保留已有数据。真实 VPS 地址和实际华为/TCL 设备仍待接入验收。
 - 验证记录：`qa/sisi-0.4.0/development-review.md` 和 `verification.json`。最终 13 项单元测试和 44 项仪器测试全部通过，共 57 项，联网 opt-in 已开启，无跳过。真实音视频解码、暂停、跳转、断网恢复和音频焦点已在专用模拟器验证。
 
-以下旧版本内容是历史记录；当前行为以开头的 0.5.0 说明及本次更名接收回执为准。
+以下旧版本内容是历史记录；当前行为以开头的 0.6 说明为准。
 
 ## 0.3 可用的公开合集自动同步（2026-09-04）
 
@@ -172,4 +180,4 @@ python3 tools/test-emulator.py --live
 
 `applicationId=family.kidcinema`、存储键保持不变。Mini 的新调试签名不能覆盖 Air 的旧调试签名包，不得卸载清数据冒充升级成功。`bash tools/package.sh` 将调试构建导出至 `output/releases/kid-player-<version>-debug.apk`；Gradle 内部中间输出仍使用标准 `app-debug.apk`。
 
-未来个人域名与 Cloudflare 路径为 `/kid-player/update.json`、`/kid-player/releases/kid-player-<version>.apk` 和独立的 `/kid-player/creators.json`。真实域名待用户提供，更新模块尚未实现，本次不部署。GitHub 仅用于私人源码和交接归档。
+更新源现已使用 `kid-player.shiyu.ren/kid-player/update.json` 与版本化 APK；作者名单仍独立配置。当前 GitHub 用于私人源码和交接归档，未来可切换到匿名可访问的 HTTPS 分发源，详见应用更新说明。

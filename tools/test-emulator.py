@@ -16,7 +16,7 @@ def text(*parts):
     return adb(*parts,stdout=subprocess.PIPE).stdout.decode().strip()
 if text('emu','avd','name').splitlines()[0].strip()!='KidCinema_Tablet_12':
     raise SystemExit('Refusing to test any device other than KidCinema_Tablet_12')
-folder=ROOT/'qa'/'kid-player-0.5.0'/('run-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
+folder=ROOT/'qa'/'kid-player-tests'/('run-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
 folder.mkdir(parents=True)
 # Preserve the existing delivery install's settings before installing a new test build.
 adb('shell','am','force-stop','family.kidcinema',stdout=subprocess.DEVNULL)

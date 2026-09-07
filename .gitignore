@@ -8,3 +8,5 @@ output/
 tools/.venv/
 tools/downloads/
 qa/
+
+__pycache__/

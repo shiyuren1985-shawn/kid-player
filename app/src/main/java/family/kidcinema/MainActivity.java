@@ -49,7 +49,7 @@ public class MainActivity extends Activity {
             Position p=new Position();p.anchor=state.getString("anchor","header");p.focus=state.getString("focus","");p.index=state.getInt("index");p.offset=state.getInt("offset");positions.put(page(),p);}
         refresh(false);
     }
-    @Override protected void onResume(){super.onResume();foreground=true;if(list!=null){render();if(store.online()&&!loading)refreshOnline(false);}handler.removeCallbacks(autoSync);handler.postDelayed(autoSync,BiliPolicy.INTERVAL_MS);}
+    @Override protected void onResume(){super.onResume();handler.postDelayed(()->{if(foreground)AppUpdater.home(this);},1200);foreground=true;if(list!=null){render();if(store.online()&&!loading)refreshOnline(false);}handler.removeCallbacks(autoSync);handler.postDelayed(autoSync,BiliPolicy.INTERVAL_MS);}
     @Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);if(hasFocus&&list!=null&&tv){Position p=positions.get(shownPage);if(p!=null&&!p.focus.isEmpty())restoreFocus(renderGeneration,p.focus,0);}}
     @Override protected void onPause(){foreground=false;if(!playbackReturnFocus.isEmpty())leftForPlayback=true;capture();handler.removeCallbacks(autoSync);super.onPause();}
     @Override protected void onSaveInstanceState(Bundle state){capture();super.onSaveInstanceState(state);state.putString("folder",folder);state.putString("section",section);Position p=positions.get(page());if(p!=null){state.putString("anchor",p.anchor);state.putString("focus",p.focus);state.putInt("index",p.index);state.putInt("offset",p.offset);}}
@@ -311,7 +311,8 @@ public class MainActivity extends Activity {
         TextView demo=text("本地演示为同一段 18 秒静音短片。",14,MUTED,false);panel.addView(demo);
         Runnable display=()->{int value=sources.getCheckedRadioButtonId();onlinePanel.setVisibility(value==R.id.source_online?View.VISIBLE:View.GONE);smbPanel.setVisibility(value==R.id.source_smb?View.VISIBLE:View.GONE);demo.setVisibility(value==R.id.source_demo?View.VISIBLE:View.GONE);};sources.setOnCheckedChangeListener((g,id)->display.run());display.run();
         space(panel,18);panel.addView(text("界面模式",16,INK,true));Spinner modes=new Spinner(this);String[] names={"自动","平板","电视"};modes.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));modes.setSelection(Math.max(0,Arrays.asList(names).indexOf(store.mode())));modes.setContentDescription("界面模式");panel.addView(modes,new LinearLayout.LayoutParams(-1,dp(56)));
-        space(panel,10);panel.addView(text("kid player 0.5.0 · 家庭自用原型",13,MUTED,false));
+        space(panel,10);panel.addView(button("检查应用更新",false,()->startActivity(new Intent(this,UpdateActivity.class))));
+        panel.addView(text("kid player "+AppUpdater.versionName(this)+" · 家庭自用原型",13,MUTED,false));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("播放设置").setView(scroll).setPositiveButton("保存",null).setNegativeButton("取消",null).create();
         dialog.setOnDismissListener(d->{if(testing[0]!=null)testing[0].cancel(true);if(!isDestroyed())render();});dialog.show();dialog.getWindow().setLayout(Math.min(dp(650),getResources().getDisplayMetrics().widthPixels-dp(32)),(int)(getResources().getDisplayMetrics().heightPixels*.88));
         dialog.getButton(-1).setOnClickListener(v->{int source=sources.getCheckedRadioButtonId();try{
