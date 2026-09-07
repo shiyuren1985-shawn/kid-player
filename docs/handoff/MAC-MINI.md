@@ -11,7 +11,7 @@
 
 ## 当前代码和产品
 
-基线提交：`3cc4e718f6831d64727c31b02b819a0363f56d0f`。版本 `0.5.0-easy-player`，versionCode 6，包名 `family.kidcinema`。后来提交仅补充交接文档。
+私人仓库：`https://github.com/shiyuren1985-shawn/sisi-cinema`。当前交接提交：`c3442f4bcc5c301ca054e6dc91c3d243dbec8f7f`。此前产品代码提交：`3cc4e718f6831d64727c31b02b819a0363f56d0f`。版本 `0.5.0-easy-player`，versionCode 6，包名 `family.kidcinema`。
 
 名称思思影院，奶油白/粉/淡紫。视频卡片直接播放；72dp 常驻返回、播放/暂停、收藏、关闭影院；播放完重放和最多四部同 UP 主视频，手动选择下一部。作者名单默认通过用户 HTTPS JSON 文件管理，本机模式独立可选；点头像切换作者。原有本地演示、只读 SMB、收藏、观看进度保留，无 PIN。
 
@@ -28,7 +28,7 @@
 
 ## 接收与环境
 
-1. 克隆私人仓库，确认 HEAD 与交接清单一致。不要覆盖 Mini 上可能存在的旧项目；如有旧目录先比较提交和未提交文件。
+1. 克隆私人仓库，确认 HEAD 为 `c3442f4bcc5c301ca054e6dc91c3d243dbec8f7f`。不要覆盖 Mini 上可能存在的旧项目；如有旧目录先比较提交和未提交文件。
 2. 解压配套 handoff ZIP 到单独目录，按 MANIFEST.json 验证文件 SHA。其中包含 git bundle、当前 APK、测试资料和交接文档。未包含真实设备偏好备份、个人凭据、签名私钥、SDK/JDK/Gradle 缓存和虚拟环境。
 3. Mini 使用自己的 JDK17、Android SDK（compileSdk35/build-tools35），检查 `tools/env.sh`、`gradle.properties` 和 `tools/run.sh` 中 Air 路径；调整本机路径后再构建。Mac Mini 用户目录未核实，不可直接假定为 /Users/shawn。
 4. `./gradlew assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug`。SMB 测试需要在 Mini 重建 `tools/.venv` 并安装 impacket。只在专用 KidCinema_Tablet_12 AVD 跑包装测试 `python3 tools/test-emulator.py`；`--live` 才允许访问真实 B 站。不得在家用正式设备清偏好跑仪器测试。
