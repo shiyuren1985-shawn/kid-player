@@ -47,7 +47,7 @@ final class RemoteImages {
         });
     }
     private static byte[] bytes(Context context,String source) throws Exception {
-        return new ImageDiskCache(new File(context.getCacheDir(),"creator-images"),24_000_000,2_000_000)
+        return new ImageDiskCache(new File(context.getCacheDir(),"creator-images"),200_000_000,2_000_000)
             .get(source,()->download(source),RemoteImages::validImage);
     }
     private static boolean validImage(byte[] data){

@@ -19,6 +19,18 @@ public class KidPlayerUiTest {
     }
     @After public void after(){device.pressHome();store.prefs.edit().clear().commit();}
     private void click(BySelector selector){UiObject2 v=device.wait(Until.findObject(selector),5000);assertNotNull(selector.toString(),v);v.click();}
+    @Test public void historyShowsCompletedVideosAndClearRequiresConfirmation()throws Exception{
+        store.progress("bili:BV0000000001",4000);store.progress("bili:BV0000000002",4000);store.progress("bili:BV0000000002",0);store.toggleFavorite("bili:BV0000000001");
+        click(By.text("◷  观看历史"));
+        assertTrue(device.wait(Until.hasObject(By.text("测试影片 2")),3000));assertTrue(device.hasObject(By.text("测试影片 1")));
+        assertTrue(device.hasObject(By.textContains("最近看过的 30 个视频")));
+        click(By.text("清空观看历史"));click(By.text("取消"));assertTrue(device.wait(Until.hasObject(By.text("测试影片 2")),3000));
+        click(By.text("清空观看历史"));click(By.text("清空"));
+        assertTrue(device.wait(Until.hasObject(By.text("还没有观看历史，播放视频后会记录在这里。")),3000));
+        assertFalse(device.findObject(By.text("清空观看历史")).isEnabled());
+        assertEquals(4000,store.progress("bili:BV0000000001"));assertTrue(store.favorite("bili:BV0000000001"));
+        click(By.text("♡  我的收藏"));assertTrue(device.wait(Until.hasObject(By.text("测试影片 1")),3000));
+    }
     @Test public void creatorManagementHasOneEntryInSettings()throws Exception{
         long selected=store.selectedCreator();
         int count=store.enabledCreators().size();

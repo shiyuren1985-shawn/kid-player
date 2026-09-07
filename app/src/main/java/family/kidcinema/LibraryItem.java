@@ -18,6 +18,7 @@ public final class LibraryItem {
         return new LibraryItem(name,BiliPolicy.bvid(id),subtitle,false,false,art,true,BiliPolicy.creatorUid(uid),image);
     }
     public String key() {return (online?"bili:":demo?"demo:":"smb:")+path;}
-    JSONObject json() throws Exception {return new JSONObject().put("name",name).put("path",path).put("subtitle",subtitle).put("art",art);}
-    static LibraryItem fromJson(JSONObject row) throws Exception {return new LibraryItem(row.getString("name"),PathPolicy.clean(row.getString("path")),row.optString("subtitle"),false,false,row.optInt("art"));}
+    JSONObject json() throws Exception {return new JSONObject().put("name",name).put("path",path).put("subtitle",subtitle).put("art",art).put("demo",demo).put("online",online).put("creatorUid",creatorUid).put("image",image);}
+    static LibraryItem fromJson(JSONObject row) throws Exception {if(row.optBoolean("online"))return online(row.getString("name"),row.getString("path"),row.optString("subtitle"),row.optInt("art"),row.getLong("creatorUid"),row.optString("image"));
+        return new LibraryItem(row.getString("name"),PathPolicy.clean(row.getString("path")),row.optString("subtitle"),false,row.optBoolean("demo"),row.optInt("art"));}
 }

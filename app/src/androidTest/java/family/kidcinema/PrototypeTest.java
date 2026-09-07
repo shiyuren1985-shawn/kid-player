@@ -46,7 +46,7 @@ public class PrototypeTest {
         // Player must actually move through the local MP4, not merely show a mock screen.
         device.pressBack();device.wait(Until.hasObject(By.text("kid player")),5000);
         assertTrue("Real playback progress saved",store.progress("demo:sample-0")>1000);
-        click(device,By.text("▷  继续观看"));
+        click(device,By.text("◷  观看历史"));
         assertNotNull(device.wait(Until.findObject(By.text("小火箭去旅行")),5000));
         click(device,By.text("小火箭去旅行"));
         click(device,By.desc("收藏视频"));

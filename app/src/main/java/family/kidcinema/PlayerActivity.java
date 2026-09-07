@@ -121,7 +121,7 @@ public class PlayerActivity extends Activity {
             player = builder.build();playerView.setPlayer(player);
             final ExoPlayer current=player;
             player.addListener(new Player.Listener() {
-                public void onRenderedFirstFrame(){if(player!=current)return;firstFrame=true;onlineStatus.setVisibility(View.GONE);handler.removeCallbacks(waiting);android.util.Log.d("KidPlayback","first video frame; paused="+!current.getPlayWhenReady());}
+                public void onRenderedFirstFrame(){if(player!=current)return;firstFrame=true;store.recordWatched(playbackScope,key);onlineStatus.setVisibility(View.GONE);handler.removeCallbacks(waiting);android.util.Log.d("KidPlayback","first video frame; paused="+!current.getPlayWhenReady());}
                 public void onIsPlayingChanged(boolean playing){screenAwake();}
                 public void onPlayWhenReadyChanged(boolean ready,int reason){screenAwake();updateActions();}
                 public void onPlayerError(PlaybackException e) {

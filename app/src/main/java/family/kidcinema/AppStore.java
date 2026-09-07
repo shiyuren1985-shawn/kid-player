@@ -189,20 +189,54 @@ public final class AppStore {
     public long progress(String scope,String key) {return prefs.getLong("progress:"+scope+":"+key,0);}
     public void progress(String key,long ms) {progress(scope(),key,ms);}
     public void progress(String scope,String key,long ms) {
-        prefs.edit().putLong("progress:"+scope+":"+key,Math.max(0,ms)).putLong("watched:"+scope+":"+key,System.currentTimeMillis()).apply();
+        prefs.edit().putLong("progress:"+scope+":"+key,Math.max(0,ms)).apply();
+        // Starting over or failing before playback must not create a history entry.
+        if(ms>0 || prefs.contains("watched:"+scope+":"+key))recordWatched(scope,key);
+    }
+    public void recordWatched(String scope,String key) {
+        long newest=0;for(long stamp:watchedEntries(scope).values())newest=Math.max(newest,stamp);
+        prefs.edit().putLong("watched:"+scope+":"+key,Math.max(System.currentTimeMillis(),newest+1)).apply();
+        trimHistory(scope);
     }
     public boolean favorite(String key) {return favorite(scope(),key);}
     public boolean favorite(String scope,String key) {return prefs.getBoolean("favorite:"+scope+":"+key,false);}
     public void toggleFavorite(String key) {toggleFavorite(scope(),key);}
     public void toggleFavorite(String scope,String key) {prefs.edit().putBoolean("favorite:"+scope+":"+key,!favorite(scope,key)).apply();}
     public void remember(List<LibraryItem> items) {
-        if(online() || demo())return;
         String key="library:"+scope();
         try {
             JSONObject index=new JSONObject(prefs.getString(key,"{}"));
             for(LibraryItem item:items)if(!item.folder)index.put(item.key(),item.json());
             prefs.edit().putString(key,index.toString()).apply();
         }catch(Exception ignored){}
+    }
+    private Map<String,Long> watchedEntries(String scope) {
+        Map<String,Long> entries=new HashMap<>();String prefix="watched:"+scope+":";
+        for(Map.Entry<String,?> entry:prefs.getAll().entrySet())
+            if(entry.getKey().startsWith(prefix)&&entry.getValue() instanceof Long&&(Long)entry.getValue()>0)
+                entries.put(entry.getKey(),(Long)entry.getValue());
+        return entries;
+    }
+    private void trimHistory(String scope) {
+        List<Map.Entry<String,Long>> entries=new ArrayList<>(watchedEntries(scope).entrySet());
+        entries.sort((a,b)->Long.compare(b.getValue(),a.getValue()));
+        SharedPreferences.Editor edit=prefs.edit();
+        for(int i=30;i<entries.size();i++)edit.remove(entries.get(i).getKey());
+        edit.apply();
+    }
+    public void clearWatchHistory() {
+        SharedPreferences.Editor edit=prefs.edit();
+        for(String key:watchedEntries(scope()).keySet())edit.remove(key);
+        edit.apply();
+    }
+    public List<LibraryItem> watchHistory(List<LibraryItem> catalog) {
+        trimHistory(scope());
+        Map<String,LibraryItem> known=new LinkedHashMap<>();
+        for(LibraryItem item:history(false))known.put(item.key(),item);
+        for(LibraryItem item:catalog)if(!item.folder&&prefs.getLong("watched:"+scope()+":"+item.key(),0)>0)known.put(item.key(),item);
+        List<LibraryItem> result=new ArrayList<>(known.values());
+        result.sort((a,b)->Long.compare(prefs.getLong("watched:"+scope()+":"+b.key(),0),prefs.getLong("watched:"+scope()+":"+a.key(),0)));
+        return result.size()>30?new ArrayList<>(result.subList(0,30)):result;
     }
     public List<LibraryItem> history(boolean favorites) {
         List<LibraryItem> result=new ArrayList<>();
@@ -212,10 +246,10 @@ public final class AppStore {
             Set<String> seen=new HashSet<>();
             while(keys.hasNext()) {
                 String key=keys.next();LibraryItem item=LibraryItem.fromJson(index.getJSONObject(key));
-                if((favorites?favorite(key):progress(key)>0)&&seen.add(key))result.add(item);
+                if((favorites?favorite(key):prefs.getLong("watched:"+scope()+":"+key,0)>0)&&seen.add(key))result.add(item);
             }
             // Older versions persisted keys only. Recover their relative paths without scanning outside the root.
-            String prefix=(favorites?"favorite:":"progress:")+scope()+":smb:";
+            String prefix=(favorites?"favorite:":"watched:")+scope()+":smb:";
             for(Map.Entry<String,?> entry:prefs.getAll().entrySet()) {
                 if(!entry.getKey().startsWith(prefix))continue;
                 boolean include=favorites?Boolean.TRUE.equals(entry.getValue()):entry.getValue() instanceof Long && (Long)entry.getValue()>0;

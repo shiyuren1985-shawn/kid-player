@@ -77,6 +77,33 @@ public class KidPlayerStoreTest {
         for(LibraryItem item:next){assertEquals(123,item.creatorUid);assertNotEquals("BV0000000001",item.path);}
         store.creatorEnabled(123,false);assertTrue(EndSuggestions.forCreator(store,123,"BV0000000001").isEmpty());
     }
+    @Test public void historyKeepsThirtyDistinctMostRecentAndCompletedVideos()throws Exception{
+        store.demo(true);List<LibraryItem> catalog=new ArrayList<>();
+        for(int i=0;i<35;i++){LibraryItem item=new LibraryItem("影片"+i,"sample-"+i,"",false,true,0);catalog.add(item);store.progress(item.key(),5000);}
+        store.remember(catalog);
+        List<LibraryItem> history=store.watchHistory(catalog);assertEquals(30,history.size());assertEquals("sample-34",history.get(0).path);assertEquals("sample-5",history.get(29).path);
+        store.progress("demo:sample-10",0);history=store.watchHistory(catalog);
+        assertEquals(30,history.size());assertEquals("sample-10",history.get(0).path);assertTrue(history.get(0).demo);
+        assertEquals(0,store.progress("demo:sample-10"));
+        long records=store.prefs.getAll().keySet().stream().filter(k->k.startsWith("watched:demo:")).count();assertEquals(30,records);
+    }
+    @Test public void clearHistoryPreservesFavoritesProgressAndOtherSources()throws Exception{
+        store.demo(true);LibraryItem item=new LibraryItem("测试","sample-0","",false,true,0);store.remember(Collections.singletonList(item));
+        store.progress(item.key(),4000);store.toggleFavorite(item.key());store.progress("bili:123","bili:BV0000000001",6000);
+        store.clearWatchHistory();assertTrue(store.watchHistory(Collections.singletonList(item)).isEmpty());
+        assertEquals(4000,store.progress(item.key()));assertTrue(store.favorite(item.key()));
+        assertTrue(store.prefs.getLong("watched:bili:123:bili:BV0000000001",0)>0);
+        store.progress(item.key(),0);assertTrue(store.watchHistory(Collections.singletonList(item)).isEmpty());
+        store.recordWatched(store.scope(),item.key());assertEquals(1,store.watchHistory(Collections.emptyList()).size());
+    }
+    @Test public void legacyWatchedEntriesMigrateWithoutLosingCompletedOrOnlineMetadata()throws Exception{
+        store.online(true);List<LibraryItem> catalog=new ArrayList<>();
+        for(int i=1;i<=35;i++){LibraryItem item=LibraryItem.online("旧影片"+i,String.format(Locale.ROOT,"BV%010d",i),"作者",0);catalog.add(item);store.prefs.edit().putLong("watched:"+store.scope()+":"+item.key(),i).commit();}
+        assertEquals(30,store.watchHistory(catalog).size());assertEquals(catalog.get(34).key(),store.watchHistory(catalog).get(0).key());
+        store.remember(Collections.singletonList(catalog.get(34)));LibraryItem restored=store.watchHistory(Collections.emptyList()).get(0);
+        assertTrue(restored.online);assertEquals(BiliPolicy.UID,restored.creatorUid);assertEquals(catalog.get(34).key(),restored.key());
+        store.clearWatchHistory();assertTrue(store.watchHistory(catalog).isEmpty());
+    }
     @Test public void sourceAndImageUrlsRejectNonHttpsOrUnrelatedImages(){
         assertThrows(IllegalArgumentException.class,()->RemoteConfig.checkedUrl("http://example.com/config.json"));
         assertThrows(IllegalArgumentException.class,()->RemoteConfig.checkedUrl("https://user:secret@example.com/config.json"));
