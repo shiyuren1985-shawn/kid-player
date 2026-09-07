@@ -32,7 +32,7 @@ public class EasyPlayerTest {
         click("重放这部视频");await(()->player()!=null&&player().getCurrentPosition()>300&&player().getCurrentPosition()<5000,15000,"Replay starts from beginning");assertFalse(device.hasObject(By.desc("播放结束页")));
     }
     @Test public void persistentButtonsFavoritePauseMediaKeysAndClose(){
-        startDemo();SystemClock.sleep(4500);click("收藏视频");assertTrue(store.favorite("demo:sample-0"));click("暂停视频");
+        startDemo();SystemClock.sleep(4500);click("收藏视频");await(()->store.favorite("demo:sample-0"),3000,"Favorite tap must persist");click("暂停视频");
         await(()->!player().getPlayWhenReady(),3000,"Large pause action works");
         device.pressKeyCode(android.view.KeyEvent.KEYCODE_MEDIA_PLAY);await(()->player().isPlaying(),4000,"Media key works while toolbar focused");
         click("关闭影院");await(()->player()==null,5000,"Closing cinema releases playback");assertTrue(device.wait(Until.gone(By.desc("常驻播放按钮区")),5000));

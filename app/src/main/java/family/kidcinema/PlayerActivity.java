@@ -81,10 +81,10 @@ public class PlayerActivity extends Activity {
         actionArea=new LinearLayout(this);actionArea.setOrientation(LinearLayout.VERTICAL);actionArea.setPadding(dp(16),dp(8),dp(16),dp(12));actionArea.setBackgroundColor(MainActivity.BG);actionArea.setContentDescription("常驻播放按钮区");
         titleLabel=new TextView(this);titleLabel.setTextColor(MainActivity.INK);titleLabel.setTextSize(17);titleLabel.setMaxLines(1);titleLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);titleLabel.setPadding(dp(6),0,dp(6),dp(8));actionArea.addView(titleLabel);
         GridLayout actions=new GridLayout(this);int columns=getResources().getConfiguration().screenWidthDp>=600?4:2;actions.setColumnCount(columns);
-        Button back=action("‹ 返回列表","返回视频列表",()->finish());
-        pauseButton=action("暂停","暂停视频",()->{if(ended){replay();return;}if(player!=null){if(player.getPlayWhenReady())player.pause();else player.play();}});
-        favoriteButton=action("♡ 收藏","收藏视频",()->{if(online&&!store.allowedCreator(creatorUid))return;store.toggleFavorite(playbackScope,key);updateActions();favoriteButton.announceForAccessibility(store.favorite(playbackScope,key)?"已收藏":"已取消收藏");});
-        Button close=action("× 关闭影院","关闭影院",()->{release();finishAffinity();});
+        Button back=iconAction("返回列表","返回视频列表",R.drawable.player_back,0xFF245C99,0xFFE2EDFF,()->finish());
+        pauseButton=iconAction("暂停","暂停视频",R.drawable.player_pause,0xFF176747,0xFFDFF3E6,()->{if(ended){replay();return;}if(player!=null){if(player.getPlayWhenReady())player.pause();else player.play();}});
+        favoriteButton=iconAction("收藏","收藏视频",R.drawable.player_heart,0xFFAD2859,0xFFFFE2EB,()->{if(online&&!store.allowedCreator(creatorUid))return;store.toggleFavorite(playbackScope,key);updateActions();favoriteButton.announceForAccessibility(store.favorite(playbackScope,key)?"已收藏":"已取消收藏");});
+        Button close=iconAction("关闭影院","关闭影院",R.drawable.player_exit,0xFF994715,0xFFFFEBD5,()->{release();finishAffinity();});
         for(Button button:new Button[]{back,pauseButton,favoriteButton,close}){GridLayout.LayoutParams params=new GridLayout.LayoutParams();params.width=0;params.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);params.setMargins(dp(4),dp(4),dp(4),dp(4));actions.addView(button,params);}
         actionArea.addView(actions);root.addView(actionArea,new LinearLayout.LayoutParams(-1,-2));updateActions();
         setContentView(root);
@@ -182,11 +182,21 @@ public class PlayerActivity extends Activity {
     private static boolean isInside(View view,View parent){for(android.view.ViewParent p=view.getParent();p!=null;p=p.getParent())if(p==parent)return true;return view==parent;}
     private android.graphics.drawable.GradientDrawable buttonBackground(boolean focused){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(MainActivity.PANEL);d.setCornerRadius(dp(16));if(focused)d.setStroke(dp(4),MainActivity.FOCUS);return d;}
     private Button action(String label,String description,Runnable action){Button b=new Button(this);b.setText(label);b.setContentDescription(description);b.setTextSize(22);b.setTextColor(MainActivity.INK);b.setAllCaps(false);b.setMinHeight(dp(72));b.setMinimumHeight(dp(72));b.setMaxLines(2);b.setPadding(dp(12),dp(12),dp(12),dp(12));b.setBackground(buttonBackground(false));b.setOnFocusChangeListener((v,focus)->v.setBackground(buttonBackground(focus)));b.setOnClickListener(v->action.run());return b;}
+    private void icon(Button button,int resource,int color){
+        android.graphics.drawable.Drawable drawable=getDrawable(resource).mutate();drawable.setTint(color);drawable.setBounds(0,0,dp(40),dp(40));
+        button.setCompoundDrawablesRelative(null,drawable,null,null);button.setCompoundDrawablePadding(dp(6));
+    }
+    private Button iconAction(String label,String description,int resource,int tint,int fill,Runnable command){
+        Button button=action(label,description,command);button.setTextSize(20);button.setGravity(Gravity.CENTER);button.setMinHeight(dp(112));button.setMinimumHeight(dp(112));
+        button.setTypeface(null,android.graphics.Typeface.BOLD);icon(button,resource,tint);
+        java.util.function.Consumer<Boolean> background=focused->{android.graphics.drawable.GradientDrawable shape=buttonBackground(focused);shape.setColor(fill);button.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x22000000),shape,null));};
+        background.accept(false);button.setOnFocusChangeListener((v,focused)->background.accept(focused));return button;
+    }
     private void updateActions(){
         if(pauseButton==null)return;
         titleLabel.setText(title+(demo?" · 本地演示 / 无音轨":""));boolean playing=player==null?resumePlaying:player.getPlayWhenReady();
-        pauseButton.setText(ended?"↻ 重放":playing?"Ⅱ 暂停":"▶ 播放");pauseButton.setContentDescription(ended?"重放视频":playing?"暂停视频":"播放视频");pauseButton.setEnabled(ended||player!=null);pauseButton.setAlpha(pauseButton.isEnabled()?1f:.45f);
-        boolean saved=store.favorite(playbackScope,key);favoriteButton.setText(saved?"♥ 已收藏":"♡ 收藏");favoriteButton.setContentDescription(saved?"取消收藏视频":"收藏视频");favoriteButton.setSelected(saved);
+        pauseButton.setText(ended?"重放":playing?"暂停":"播放");icon(pauseButton,ended?R.drawable.player_replay:playing?R.drawable.player_pause:R.drawable.player_play,0xFF176747);pauseButton.setContentDescription(ended?"重放视频":playing?"暂停视频":"播放视频");pauseButton.setEnabled(ended||player!=null);pauseButton.setAlpha(pauseButton.isEnabled()?1f:.45f);
+        boolean saved=store.favorite(playbackScope,key);favoriteButton.setText(saved?"已收藏":"收藏");icon(favoriteButton,saved?R.drawable.player_heart_filled:R.drawable.player_heart,0xFFAD2859);favoriteButton.setContentDescription(saved?"取消收藏视频":"收藏视频");favoriteButton.setSelected(saved);
     }
     private void showEndScreen(){
         ended=true;onlineStatus.setVisibility(View.GONE);handler.removeCallbacks(waiting);playerView.hideController();playerView.setUseController(false);updateActions();
