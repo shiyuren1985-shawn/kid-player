@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
         });
     }
     private void refreshOnline(boolean manual){
-        if(loading)return;
+        if(loading||BiliSync.running(store.selectedCreator())){render();if(manual)toast("正在更新投稿目录，请稍候。");return;}
         // Show the saved catalogue even while the remote creator list is being checked.
         if(items.isEmpty()&&store.selectedCreator()>0){try{items=BiliClient.items(store.feed(),store.selectedCreator());}catch(Exception ignored){}}
         if(store.remoteCreators() && !store.remoteUrl().isEmpty() && (manual||RemoteConfig.due(store))) {
@@ -128,13 +128,21 @@ public class MainActivity extends Activity {
         loadTask=io.submit(()->{RemoteConfig.refresh(store,manual);runOnUiThread(()->{if(isDestroyed()||request!=generation)return;loading=false;items=new ArrayList<>();refreshCreator(manual);});});
     }
     private String creatorSignature(){StringBuilder s=new StringBuilder(Boolean.toString(store.remoteCreators()));for(AppStore.Creator c:store.enabledCreators())s.append(":").append(c.uid);return s.toString();}
-    private void onCreatorsChanged(String key){if(key!=null&&key.startsWith("creators"))handler.post(()->{if(foreground&&store.online()&&!knownCreators.equals(creatorSignature())){capture();cancelLoad();items=new ArrayList<>();refreshCreator(false);}});}
+    private final Runnable feedChanged=()->{
+        if(!foreground||!store.online())return;
+        try{items=BiliClient.items(store.feed(),store.selectedCreator());error=store.syncError();if(store.feed().optBoolean("collectionsComplete")&&!folder.isEmpty()&&chosenCollection()==null)folder="";render();}catch(Exception ignored){}
+    };
+    private void onCreatorsChanged(String key){
+        if(key==null)return;
+        if(key.startsWith("creators"))handler.post(()->{if(foreground&&store.online()&&!knownCreators.equals(creatorSignature())){capture();cancelLoad();items=new ArrayList<>();refreshCreator(false);}});
+        if(store.online()&&store.selectedCreator()>0&&(key.equals(store.biliKey(store.selectedCreator(),"feed"))||key.equals(store.biliKey(store.selectedCreator(),"error"))||key.equals(store.biliKey(store.selectedCreator(),"attempt")))){handler.removeCallbacks(feedChanged);handler.postDelayed(feedChanged,100);}
+    }
     private void refreshCreator(boolean manual){
         knownCreators=creatorSignature();long uid=store.selectedCreator();
         if(uid==0){items=new ArrayList<>();error="";render();return;}
         try{items=BiliClient.items(store.feed(uid),uid);error=store.syncError(uid);}catch(Exception e){items=new ArrayList<>();error=BiliClient.friendly(e);}
         BiliSyncWorker.schedule(this);
-        if(!BiliSync.due(store,uid,manual)){render();if(manual)toast("刚刚检查过，稍后再更新；已有影片仍可观看。");return;}
+        if(!BiliSync.due(store,uid,manual)){render();if(manual)toast(BiliSync.cooldownMessage(store,uid));return;}
         loading=true;int request=++generation;render();
         BiliClient client=new BiliClient(uid);syncClient=client;
         loadTask=io.submit(()->{
@@ -147,15 +155,41 @@ public class MainActivity extends Activity {
     private void section(String value){capture();section=value;error="";if(!store.online()&&!store.demo()&&value.equals("全部影片"))refresh(false);else render();}
     private void selectCreator(long uid){capture();cancelLoad();store.selectedCreator(uid);folder="";if(tv&&!positions.containsKey(page())){Position p=new Position();p.focus="creator:"+uid;positions.put(page(),p);}items=new ArrayList<>();error="";refreshOnline(false);}
     private void online(){capture();cancelLoad();store.online(true);folder="";section="全部影片";items=new ArrayList<>();error="";refreshOnline(false);}
+    private boolean catalogBusy(){return loading||(store.online()&&BiliSync.running(store.selectedCreator()));}
     private String onlineStatus(){
-        if(store.selectedCreator()==0)return (store.remoteCreators()?"请在云端文件配置作者后读取名单":"在播放设置中添加并启用 UP 主");
-        try{org.json.JSONObject feed=store.feed();long time=feed.getLong("syncedAt");if(time==0)return items.isEmpty()?"等待首次同步":"初始目录 · 自动同步尚未成功";
-            return "上次更新 "+new java.text.SimpleDateFormat("MM-dd HH:mm",Locale.CHINA).format(new Date(time))+" · 公开合集 "+feed.optInt("collectionCount")+" 个 · 最新 "+feed.getJSONArray("videos").length()+" 条";
+        if(store.selectedCreator()==0)return store.remoteCreators()?"请在云端文件配置作者，再读取名单。":"请在播放设置添加并启用 UP 主。";
+        try{org.json.JSONObject feed=store.feed();
+            if(feed.has("total"))return (feed.optBoolean("syncComplete")?"全部投稿 "+feed.getInt("total")+" 条":"投稿已读取 "+feed.optInt("loadedCount")+" / 共 "+feed.getInt("total")+" 条（尚未读完）")
+                +(feed.optLong("syncedAt")>0?" · 上次完整更新 "+new java.text.SimpleDateFormat("MM-dd HH:mm",Locale.CHINA).format(new Date(feed.getLong("syncedAt"))):"");
+            return "缓存目录 "+feed.getJSONArray("videos").length()+" 条 · 待核对全部投稿";
         }catch(Exception e){return "目录暂不可用";}
+    }
+    private org.json.JSONArray collections(){try{org.json.JSONArray rows=store.feed().optJSONArray("collections");return rows==null?new org.json.JSONArray():rows;}catch(Exception e){return new org.json.JSONArray();}}
+    private org.json.JSONObject chosenCollection(){
+        org.json.JSONArray rows=collections();for(int i=0;i<rows.length();i++){org.json.JSONObject row=rows.optJSONObject(i);if(row!=null&&folder.equals(row.optString("key")))return row;}return null;
+    }
+    private void allPosts(){capture();folder="";render();}
+    private void chooseCollection(){
+        org.json.JSONArray rows=collections();String[] names=new String[rows.length()+1];names[0]="全部投稿";
+        for(int i=0;i<rows.length();i++){org.json.JSONObject c=rows.optJSONObject(i);names[i+1]=c.optString("name")+" · "+c.optInt("total")+" 条";}
+        new AlertDialog.Builder(this).setTitle("选择合集").setItems(names,(d,which)->{capture();folder=which==0?"":rows.optJSONObject(which-1).optString("key");render();}).setNegativeButton("取消",null).show();
+    }
+    private String catalogScope(){
+        org.json.JSONObject c=chosenCollection();return c==null?"包含全部公开投稿，未加入合集的视频也会显示。":"合集："+c.optString("name")+" · 显示其中属于这位作者的投稿";
+    }
+    private String emptyCatalogMessage(){
+        if(store.selectedCreator()==0)return store.remoteCreators()?"请在云端文件配置作者，再读取名单。":"请在播放设置添加并启用 UP 主。";
+        if(!error.isEmpty())return "视频暂未加载成功，请查看上方原因，稍后重试。";
+        if(chosenCollection()!=null)return "这个合集暂没有匹配到已读取的作者投稿。";
+        try{if(store.feed().optBoolean("syncComplete"))return "该作者目前没有公开投稿。";}catch(Exception ignored){}
+        return "尚未加载这位作者的视频，请点击刷新。";
     }
     private List<LibraryItem> filtered(){
         if(!store.online()&&!store.demo()&&!section.equals("全部影片"))return store.history(section.equals("我的收藏"));
+        Set<String> members=null;
+        if(store.online()&&section.equals("全部影片")&&chosenCollection()!=null){members=new HashSet<>();org.json.JSONArray ids=chosenCollection().optJSONArray("bvids");if(ids!=null)for(int i=0;i<ids.length();i++)members.add(ids.optString(i));}
         List<LibraryItem> result=new ArrayList<>();for(LibraryItem item:items){
+            if(members!=null&&!members.contains(item.path))continue;
             if(section.equals("我的收藏")&&(item.folder||!store.favorite(item.key())))continue;
             if(section.equals("继续观看")&&(item.folder||store.progress(item.key())<=0))continue;result.add(item);
         }return result;
@@ -189,7 +223,7 @@ public class MainActivity extends Activity {
         nav.removeAllViews();boolean wide=getResources().getConfiguration().screenWidthDp>=780;
         String[] names={"全部影片","继续观看","我的收藏"};String[] glyphs={"▦  ","▷  ","♡  "};
         for(int i=0;i<names.length;i++){String name=names[i];Button button=button(glyphs[i]+name,section.equals(name),()->section(name));button.setTag("nav:"+name);button.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(wide?-1:dp(150),-2);p.setMargins(0,0,wide?0:dp(8),dp(10));nav.addView(button,p);}
-        Button up=button(store.online()?"管理 UP 主":"UP 主视频",false,()->{if(store.online())manageCreators();else online();});up.setTag("nav:online");nav.addView(up,new LinearLayout.LayoutParams(wide?-1:dp(150),-2));
+        if(!store.online()){Button up=button("UP 主视频",false,this::online);up.setTag("nav:online");nav.addView(up,new LinearLayout.LayoutParams(wide?-1:dp(150),-2));}
         if(wide){space(nav,22);nav.addView(text(store.online()?"只看已选择的作者\n按作者挑选影片":store.demo()?"●  本地演示\n18 秒静音短片":"家庭存储\n只读指定目录",13,MUTED,false));}
     }
     private View listHeader(){
@@ -202,25 +236,31 @@ public class MainActivity extends Activity {
                 TextView name=text((selected?"✓ ":"")+creator.name,tv?16:14,selected?GREEN:INK,true);name.setMaxLines(2);name.setGravity(Gravity.CENTER);name.setEllipsize(android.text.TextUtils.TruncateAt.END);author.addView(name);author.setOnClickListener(v->selectCreator(creator.uid));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(tv?140:124),-2);p.setMargins(0,0,dp(8),0);row.addView(author,p);
             }
             authors.addView(row);box.addView(authors);space(box,12);
+            if(section.equals("全部影片")){
+                LinearLayout filters=row();Button all=button("全部投稿",folder.isEmpty(),this::allPosts);all.setTag("filter:all");filters.addView(all);
+                if(collections().length()>0){Button groups=button(chosenCollection()==null?"合集（"+collections().length()+"）":"当前合集",!folder.isEmpty(),this::chooseCollection);groups.setTag("filter:collections");LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-2,-2);fp.setMargins(dp(10),0,0,0);filters.addView(groups,fp);}
+                box.addView(filters);space(box,10);
+            }
+            try{String issue=store.feed().optString("collectionsError");if(!issue.isEmpty())box.addView(text(issue+"；全部投稿仍可浏览。",13,ERROR,false));}catch(Exception ignored){}
         }
         LinearLayout titleRow=row();String title=section;
-        if(section.equals("全部影片")){if(store.online()){AppStore.Creator c=store.creator(store.selectedCreator());title=c==null?"我的 UP 主":c.name+"的视频";}else if(!folder.isEmpty())title=folder.substring(folder.lastIndexOf('/')+1);}
+        if(section.equals("全部影片")){if(store.online()){AppStore.Creator c=store.creator(store.selectedCreator());title=chosenCollection()!=null?chosenCollection().optString("name"):c==null?"我的 UP 主":c.name+"的全部投稿";}else if(!folder.isEmpty())title=folder.substring(folder.lastIndexOf('/')+1);}
         titleRow.addView(text(title,tv?24:22,INK,true),new LinearLayout.LayoutParams(0,-2,1));
-        if(!folder.isEmpty() && section.equals("全部影片"))titleRow.addView(button("‹ 上一层",false,this::up));
-        if(loading){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setTag("sync:progress");spinner.setContentDescription("正在更新目录");spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(GREEN));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(24),dp(24));sp.setMargins(0,0,dp(10),0);titleRow.addView(spinner,sp);}
-        Button refresh=button(loading?"更新中":"刷新",false,this::refresh);refresh.setTag("refresh");refresh.setEnabled(!loading);titleRow.addView(refresh);box.addView(titleRow);space(box,6);
+        if(!store.online()&&!folder.isEmpty() && section.equals("全部影片"))titleRow.addView(button("‹ 上一层",false,this::up));
+        if(catalogBusy()){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setTag("sync:progress");spinner.setContentDescription("正在更新目录");spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(GREEN));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(24),dp(24));sp.setMargins(0,0,dp(10),0);titleRow.addView(spinner,sp);}
+        Button refresh=button(catalogBusy()?"更新中":"刷新",false,this::refresh);refresh.setTag("refresh");refresh.setEnabled(!catalogBusy());titleRow.addView(refresh);box.addView(titleRow);space(box,6);
         box.addView(text(store.online()?onlineStatus():store.demo()?"4 种封面 · 共用 1 段 18 秒静音演示片":section.equals("全部影片")?"当前文件夹 · 可进入子文件夹":"允许目录内的全部"+section,13,MUTED,false));
-        if(store.online()){space(box,6);box.addView(text("公开合集最新 30 条；未加入合集的投稿可能遗漏。",13,MUTED,false));if(store.remoteCreators()&&!store.prefs.getString("remote.error","").isEmpty())box.addView(text("云端名单更新未完成，保留上次名单。",13,ERROR,false));}
-        if(loading){space(box,8);box.addView(text(store.online()?(items.isEmpty()?"正在读取作者目录…":"正在更新，已有影片可以继续观看…"):"正在读取家庭存储…",14,GREEN,false));}
-        if(!error.isEmpty()){space(box,8);TextView failure=text((store.online()?"本次更新未完成，保留上次目录\n":"")+error,14,ERROR,false);box.addView(failure);}
-        if(section.equals("全部影片")&&!items.isEmpty()){
-            LibraryItem pick=null;for(LibraryItem i:items)if(!i.folder&&store.progress(i.key())>0){pick=i;break;}if(pick==null)for(LibraryItem i:items)if(!i.folder){pick=i;break;}
+        if(store.online()){space(box,6);box.addView(text(catalogScope(),13,MUTED,false));if(store.remoteCreators()&&!store.prefs.getString("remote.error","").isEmpty())box.addView(text("云端名单更新未完成，保留上次名单。",13,ERROR,false));}
+        if(catalogBusy()){space(box,8);box.addView(text(store.online()?(items.isEmpty()?"正在读取全部投稿…":"正在分批更新，已缓存影片可以继续观看…"):"正在读取家庭存储…",14,GREEN,false));}
+        if(!error.isEmpty()){space(box,8);TextView failure=text((store.online()?(items.isEmpty()?"暂未加载到视频\n":"本次更新未完成，保留上次目录\n"):"")+error,14,ERROR,false);box.addView(failure);}
+        if(section.equals("全部影片")&&!visible.isEmpty()){
+            LibraryItem pick=null;for(LibraryItem i:visible)if(!i.folder&&store.progress(i.key())>0){pick=i;break;}if(pick==null)for(LibraryItem i:visible)if(!i.folder){pick=i;break;}
             if(pick!=null){final LibraryItem item=pick;space(box,12);LinearLayout banner=row();banner.setPadding(dp(16),dp(12),dp(16),dp(12));banner.setBackground(bg(PANEL,18));
                 LinearLayout words=column();words.addView(text(store.progress(item.key())>0?"继续这个故事":"今天想看这一部吗？",14,GREEN,true));TextView name=text(item.name,16,INK,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);words.addView(name);banner.addView(words,new LinearLayout.LayoutParams(0,-2,1));
                 Button play=button(store.demo()?"▶  播放演示短片":store.progress(item.key())>0?"继续播放":"播放",true,()->play(item,false,"hero"));play.setTag("hero");banner.addView(play);box.addView(banner);
             }
         }
-        if(visible.isEmpty()&&!loading){space(box,14);String message=section.equals("我的收藏")?"还没有收藏的影片。播放时点一下收藏。":section.equals("继续观看")?"看过的故事，会在这里等你继续。":store.online()?(store.remoteCreators()?"请在云端文件配置作者，再读取名单并更新目录。":"在播放设置添加并启用 UP 主，然后更新目录。"):"这个文件夹还没有影片。";TextView empty=text(message,17,MUTED,false);empty.setPadding(dp(20),dp(24),dp(20),dp(24));empty.setBackground(bg(PANEL,18));box.addView(empty);}
+        if(visible.isEmpty()&&!catalogBusy()){space(box,14);String message=section.equals("我的收藏")?"还没有收藏的影片。播放时点一下收藏。":section.equals("继续观看")?"看过的故事，会在这里等你继续。":store.online()?emptyCatalogMessage():"这个文件夹还没有影片。";TextView empty=text(message,17,MUTED,false);empty.setPadding(dp(20),dp(24),dp(20),dp(24));empty.setBackground(bg(PANEL,18));box.addView(empty);}
         return box;
     }
     private final class Cards extends RecyclerView.Adapter<Cards.Holder>{
@@ -281,7 +321,7 @@ public class MainActivity extends Activity {
         }
         return super.dispatchKeyEvent(event);
     }
-    @Override public void onBackPressed(){if(!section.equals("全部影片")){section("全部影片");return;}if(!folder.isEmpty()){up();return;}super.onBackPressed();}
+    @Override public void onBackPressed(){if(!section.equals("全部影片")){section("全部影片");return;}if(!folder.isEmpty()){if(store.online())allPosts();else up();return;}super.onBackPressed();}
     private void toast(String value){Toast.makeText(this,value,Toast.LENGTH_LONG).show();}
     private EditText field(LinearLayout panel,String label,String value,String hint,boolean password){panel.addView(text(label,14,INK,true));EditText input=new EditText(this);input.setText(value);input.setHint(hint);input.setTextSize(16);input.setSingleLine(true);input.setContentDescription(label);input.setMinHeight(dp(56));input.setInputType(password?InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD:InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);panel.addView(input,new LinearLayout.LayoutParams(-1,-2));space(panel,10);return input;}
     private void settings(){
@@ -290,7 +330,7 @@ public class MainActivity extends Activity {
         panel.addView(text("内容来源",17,INK,true));RadioGroup sources=new RadioGroup(this);String[] sourceNames={"UP 主视频","家庭存储","本地演示"};
         int[] sourceIds={R.id.source_online,R.id.source_smb,R.id.source_demo};
         for(int i=0;i<sourceNames.length;i++){RadioButton radio=new RadioButton(this);radio.setId(sourceIds[i]);radio.setText(sourceNames[i]);radio.setTextSize(16);radio.setMinHeight(dp(52));sources.addView(radio);}sources.check(store.online()?R.id.source_online:store.demo()?R.id.source_demo:R.id.source_smb);panel.addView(sources);
-        LinearLayout onlinePanel=column();onlinePanel.addView(text("点击头像分类观看。每位作者独立更新公开合集最新 30 条，未加入合集的投稿可能遗漏。",14,MUTED,false));space(onlinePanel,10);onlinePanel.addView(button("管理 UP 主名单",false,this::manageCreators));panel.addView(onlinePanel);
+        LinearLayout onlinePanel=column();onlinePanel.addView(text("点击头像分类观看。默认读取每位作者的全部公开投稿，合集用于分类。投稿分批加载并保存在本机。",14,MUTED,false));space(onlinePanel,10);onlinePanel.addView(button("管理 UP 主名单",false,this::manageCreators));panel.addView(onlinePanel);
         LinearLayout smbPanel=column();panel.addView(smbPanel);smbPanel.addView(text("请使用家庭存储的只读账号，并选择允许观看的目录。",14,MUTED,false));space(smbPanel,10);
         EditText host=field(smbPanel,"家庭存储地址",previous.host,"例如 192.168.1.10",false);
         EditText port=field(smbPanel,"SMB 端口",Integer.toString(previous.port),"445",false);port.setInputType(InputType.TYPE_CLASS_NUMBER);
@@ -314,6 +354,7 @@ public class MainActivity extends Activity {
         TextView demo=text("本地演示为同一段 18 秒静音短片。",14,MUTED,false);panel.addView(demo);
         Runnable display=()->{int value=sources.getCheckedRadioButtonId();onlinePanel.setVisibility(value==R.id.source_online?View.VISIBLE:View.GONE);smbPanel.setVisibility(value==R.id.source_smb?View.VISIBLE:View.GONE);demo.setVisibility(value==R.id.source_demo?View.VISIBLE:View.GONE);};sources.setOnCheckedChangeListener((g,id)->display.run());display.run();
         space(panel,18);panel.addView(text("界面模式",16,INK,true));Spinner modes=new Spinner(this);String[] names={"自动","平板","电视"};modes.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));modes.setSelection(Math.max(0,Arrays.asList(names).indexOf(store.mode())));modes.setContentDescription("界面模式");panel.addView(modes,new LinearLayout.LayoutParams(-1,dp(56)));
+        space(panel,10);panel.addView(button("缓存管理",false,this::cacheSettings));
         space(panel,10);panel.addView(button("检查应用更新",false,()->startActivity(new Intent(this,UpdateActivity.class))));
         panel.addView(text("kid player "+AppUpdater.versionName(this)+" · 家庭自用原型",13,MUTED,false));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("播放设置").setView(scroll).setPositiveButton("保存",null).setNegativeButton("取消",null).create();
@@ -322,6 +363,15 @@ public class MainActivity extends Activity {
             if(source==R.id.source_smb){AppStore.Config c=collect.get();if(c==null)return;store.save(c);}
             capture();cancelLoad();store.demo(source==R.id.source_demo);store.online(source==R.id.source_online);store.mode(names[modes.getSelectedItemPosition()]);folder="";section="全部影片";items=new ArrayList<>();error="";dialog.dismiss();refresh(false);
         }catch(Exception e){toast("设置保存失败，请稍后重试。");}});
+    }
+    private void cacheSettings(){
+        LinearLayout panel=column();panel.setPadding(dp(22),dp(16),dp(22),dp(18));
+        panel.addView(text("图片按需缓存，磁盘上限 24 MB；视频仅缓存播放时读取的片段，上限 256 MiB。空间不足时直接在线播放。",15,INK,false));space(panel,12);
+        panel.addView(text("清理缓存不会删除 UP 主名单、目录、收藏和观看记录。再次观看会按需重新缓存。",14,MUTED,false));space(panel,12);
+        TextView status=text("正在统计缓存…",14,INK,false);panel.addView(status);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("缓存管理").setView(panel).setPositiveButton("清理图片和视频缓存",null).setNegativeButton("关闭",null).create();dialog.show();
+        settingsIo.submit(()->{PlaybackCache.initialize(getApplicationContext());long pictures=RemoteImages.diskBytes(this),video=PlaybackCache.bytes(this);runOnUiThread(()->{if(dialog.isShowing())status.setText(String.format(Locale.CHINA,"图片 %.1f MB · 视频 %.1f MiB",pictures/1000000.0,video/1048576.0));});});
+        dialog.getButton(-1).setOnClickListener(v->{dialog.getButton(-1).setEnabled(false);status.setText("正在清理…");settingsIo.submit(()->{String result;try{RemoteImages.clear(this);PlaybackCache.clear(this);result="缓存已清理；名单、收藏和观看记录已保留。";}catch(Exception e){result="部分缓存暂时无法清理，请稍后重试。";}String message=result;runOnUiThread(()->{if(dialog.isShowing()){status.setText(message);dialog.getButton(-1).setEnabled(true);}});});});
     }
     private void invalid(EditText field,String message){field.setError(message);field.requestFocus();field.requestRectangleOnScreen(new android.graphics.Rect(0,0,field.getWidth(),field.getHeight()),false);}
     private void manageCreators(){

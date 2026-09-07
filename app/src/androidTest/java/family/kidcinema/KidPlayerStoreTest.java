@@ -60,9 +60,10 @@ public class KidPlayerStoreTest {
         c.root="another";store.save(c);assertTrue(store.history(true).isEmpty());
     }
     @Test public void secondCreatorCollectionScanAndPlaybackVerifyThatCreator()throws Exception{
-        BiliCollectionsTest.Fixture base=new BiliCollectionsTest.Fixture();base.collectionOwner=123;
-        BiliClient client=new BiliClient(123,path->{JSONObject reply=base.get(path);if(path.contains("web-interface/view"))reply.getJSONObject("data").getJSONObject("owner").put("mid",123);return reply;});
-        JSONObject feed=client.syncCollections();assertEquals(123,feed.getLong("uid"));assertEquals(2,BiliClient.items(feed,123).size());
+        CatalogFixture base=new CatalogFixture();base.uid=123;base.count=65;
+        BiliClient client=new BiliClient(123,base);
+        JSONObject old=new JSONObject().put("schema",1).put("uid",123).put("syncedAt",0).put("videos",new org.json.JSONArray());
+        JSONObject feed=client.syncCatalog(old,true,f->{});assertEquals(123,feed.getLong("uid"));assertEquals(65,BiliClient.items(feed,123).size());
         assertThrows(IllegalArgumentException.class,()->BiliClient.items(feed,BiliPolicy.UID));
         BiliClient wrong=new BiliClient(123,path->new JSONObject().put("code",0).put("data",new JSONObject().put("bvid","BV1Yptj6zEEG").put("owner",new JSONObject().put("mid",456))));
         assertThrows(IllegalArgumentException.class,()->wrong.resolve("BV1Yptj6zEEG"));

@@ -145,9 +145,9 @@ public class PlayerActivity extends Activity {
             long startPosition=Math.max(0,store.progress(playbackScope,key));
             if(online){
                 BiliClient.Playback streams=onlinePlayback;
-                ProgressiveMediaSource.Factory factory=new ProgressiveMediaSource.Factory(()->new BiliDataSource(streams.videoUrls));
+                ProgressiveMediaSource.Factory factory=new ProgressiveMediaSource.Factory(PlaybackCache.factory(()->new BiliDataSource(streams.videoUrls)));
                 MediaSource video=factory.createMediaSource(MediaItem.fromUri(uri));
-                player.setMediaSource(streams.audio==null?video:new MergingMediaSource(video,new ProgressiveMediaSource.Factory(()->new BiliDataSource(streams.audioUrls)).createMediaSource(MediaItem.fromUri(streams.audio))),startPosition);
+                player.setMediaSource(streams.audio==null?video:new MergingMediaSource(video,new ProgressiveMediaSource.Factory(PlaybackCache.factory(()->new BiliDataSource(streams.audioUrls))).createMediaSource(MediaItem.fromUri(streams.audio))),startPosition);
             }else player.setMediaItem(MediaItem.fromUri(uri),startPosition);
             player.prepare();player.setPlayWhenReady(resumePlaying);updateActions();playerView.requestFocus();handler.post(saver);
         } catch (Exception e) {
@@ -159,7 +159,7 @@ public class PlayerActivity extends Activity {
         final BiliClient client=new BiliClient(creatorUid);resolvingClient=client;
         resolveTask=network.submit(()->{
             BiliClient.Playback result=null;String failure="";
-            try{if(!store.online()||!store.allowedCreator(creatorUid)||!BiliClient.contains(store.feed(creatorUid),path,creatorUid))throw new IllegalArgumentException("视频不在当前允许目录中");result=client.resolve(path);}
+            try{if(!store.online()||!store.allowedCreator(creatorUid)||!BiliClient.contains(store.feed(creatorUid),path,creatorUid))throw new IllegalArgumentException("视频不在当前允许目录中");result=client.resolve(path);PlaybackCache.initialize(getApplicationContext());}
             catch(Exception e){failure=BiliClient.friendly(e);}
             final BiliClient.Playback playback=result;final String message=failure;
             runOnUiThread(()->{

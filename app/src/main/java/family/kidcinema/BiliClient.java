@@ -55,29 +55,32 @@ public final class BiliClient {
     private static String imageKey(String url) {
         String file=url.substring(url.lastIndexOf('/')+1);return file.substring(0,file.indexOf('.'));
     }
-    public JSONObject sync() throws Exception {
-        JSONObject nav=transport.get("/x/web-interface/nav");
-        if(nav.getInt("code")!=0 && nav.getInt("code")!=-101)data(nav);
-        JSONObject keys=nav.getJSONObject("data").getJSONObject("wbi_img");
-        Map<String,String> params=new HashMap<>();params.put("mid",Long.toString(uid));params.put("pn","1");params.put("ps","30");params.put("order","pubdate");
-        String query=BiliPolicy.signedQuery(params,imageKey(keys.getString("img_url")),imageKey(keys.getString("sub_url")),System.currentTimeMillis()/1000);
-        JSONObject response=data(transport.get("/x/space/wbi/arc/search?"+query));
-        JSONArray rows=response.getJSONObject("list").getJSONArray("vlist"), videos=new JSONArray();
-        if(rows.length()>30)throw new IOException("投稿列表超过本次同步范围");
-        Set<String> seen=new HashSet<>();
-        for(int i=0;i<rows.length();i++){
-            JSONObject row=rows.getJSONObject(i);BiliPolicy.owner(row.getLong("mid"),uid);
-            String id=BiliPolicy.bvid(row.getString("bvid"));if(!seen.add(id))continue;
-            videos.put(new JSONObject().put("bvid",id).put("uid",uid).put("title",row.getString("title"))
-                .put("author",row.getString("author")).put("published",row.getLong("created")).put("duration",row.optString("length")));
+    JSONObject api(String path)throws Exception{return transport.get(path);}
+    private String uploadImageKey,uploadSubKey;
+    JSONObject uploadPage(int page)throws Exception{
+        if(page<1)throw new IOException("投稿页码无效");
+        if(uploadImageKey==null){
+            JSONObject nav=transport.get("/x/web-interface/nav");if(nav.getInt("code")!=0&&nav.getInt("code")!=-101)data(nav);
+            JSONObject keys=nav.getJSONObject("data").getJSONObject("wbi_img");uploadImageKey=imageKey(keys.getString("img_url"));uploadSubKey=imageKey(keys.getString("sub_url"));
         }
-        return new JSONObject().put("schema",1).put("uid",uid).put("syncedAt",System.currentTimeMillis()).put("videos",videos);
+        Map<String,String> params=new HashMap<>();params.put("mid",Long.toString(uid));params.put("pn",Integer.toString(page));params.put("ps","30");params.put("order","pubdate");
+        JSONObject response=data(transport.get("/x/space/wbi/arc/search?"+BiliPolicy.signedQuery(params,uploadImageKey,uploadSubKey,System.currentTimeMillis()/1000)));
+        JSONObject paging=response.getJSONObject("page");int total=paging.getInt("count");
+        if(total<0||paging.getInt("pn")!=page||paging.getInt("ps")!=30)throw new IOException("投稿分页信息无效。");
+        JSONArray rows=response.getJSONObject("list").getJSONArray("vlist"),videos=new JSONArray();
+        if(rows.length()!=Math.min(30,Math.max(0L,total-(long)(page-1)*30)))throw new IOException("投稿分页不完整，保留已有目录。");
+        for(int i=0;i<rows.length();i++){
+            JSONObject row=rows.getJSONObject(i);BiliPolicy.owner(row.getLong("mid"),uid);long published=row.getLong("created");if(published<=0)throw new IOException("投稿时间无效");
+            videos.put(new JSONObject().put("bvid",BiliPolicy.bvid(row.getString("bvid"))).put("uid",uid).put("title",row.getString("title"))
+                .put("author",row.getString("author")).put("published",published).put("duration",row.optString("length")).put("pic",row.optString("pic")));
+        }
+        return new JSONObject().put("total",total).put("page",page).put("videos",videos);
     }
-    public JSONObject syncCollections() throws Exception {return new BiliCollections(uid,transport).sync();}
+    JSONObject syncCatalog(JSONObject old,boolean manual,BiliCatalog.Save save)throws Exception{return new BiliCatalog(uid,this).sync(old,manual,save);}
     public static List<LibraryItem> items(JSONObject feed) throws Exception {return items(feed,BiliPolicy.UID);}
     public static List<LibraryItem> items(JSONObject feed,long uid) throws Exception {
         if(feed.getInt("schema")!=1)throw new IOException("目录格式不支持");BiliPolicy.owner(feed.getLong("uid"),uid);
-        JSONArray rows=feed.getJSONArray("videos");if(rows.length()>30)throw new IOException("目录过大");
+        JSONArray rows=feed.getJSONArray("videos");
         List<LibraryItem> items=new ArrayList<>();Set<String> seen=new HashSet<>();
         for(int i=0;i<rows.length();i++){
             JSONObject row=rows.getJSONObject(i);BiliPolicy.owner(row.getLong("uid"),uid);String id=BiliPolicy.bvid(row.getString("bvid"));

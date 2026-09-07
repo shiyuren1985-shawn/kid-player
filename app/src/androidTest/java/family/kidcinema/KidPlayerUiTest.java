@@ -19,13 +19,16 @@ public class KidPlayerUiTest {
     }
     @After public void after(){device.pressHome();store.prefs.edit().clear().commit();}
     private void click(BySelector selector){UiObject2 v=device.wait(Until.findObject(selector),5000);assertNotNull(selector.toString(),v);v.click();}
-    @Test public void manageCreatorsOpensListWithoutChangingSelection()throws Exception{
+    @Test public void creatorManagementHasOneEntryInSettings()throws Exception{
         long selected=store.selectedCreator();
         int count=store.enabledCreators().size();
-        click(By.text("管理 UP 主"));
+        assertFalse(device.hasObject(By.text("管理 UP 主")));
+        click(By.desc("播放设置"));
+        click(By.text("管理 UP 主名单"));
         assertTrue(device.wait(Until.hasObject(By.text("UP 主名单来源")),3000));
         assertEquals(selected,store.selectedCreator());assertEquals(count,store.enabledCreators().size());
         click(By.text("完成"));
+        click(By.text("取消"));
         assertTrue(device.wait(Until.hasObject(By.text("测试影片 1")),3000));
     }
     @Test public void progressIndicatorTracksLoadingWhileCachedCardsRemain()throws Exception{
@@ -50,6 +53,32 @@ public class KidPlayerUiTest {
         });
         assertTrue(device.wait(Until.gone(By.desc("正在更新目录")),3000));
         assertTrue(device.findObject(By.text("刷新")).isEnabled());
+    }
+    @Test public void allUploadsAndCollectionFilterHaveSeparateLists()throws Exception{
+        CatalogFixture fixture=new CatalogFixture();fixture.count=65;
+        JSONObject old=store.feed();JSONObject full=new BiliClient(fixture).syncCatalog(old,true,f->{});store.feed(full);
+        assertTrue(device.wait(Until.hasObject(By.textContains("全部投稿 65 条")),5000));
+        assertTrue(device.hasObject(By.text("模拟投稿 65")));assertFalse(device.hasObject(By.text("管理 UP 主")));
+        click(By.text("合集（1）"));click(By.text("模拟合集 1 · 35 条"));
+        assertTrue(device.wait(Until.hasObject(By.text("模拟投稿 35")),3000));assertFalse(device.hasObject(By.text("模拟投稿 65")));
+        click(By.text("全部投稿"));assertTrue(device.wait(Until.hasObject(By.text("模拟投稿 65")),3000));
+        for(int attempt=0;attempt<25&&!device.hasObject(By.text("模拟投稿 1"));attempt++){
+            android.graphics.Rect bounds=device.findObject(By.desc("影片列表")).getVisibleBounds();
+            device.swipe(bounds.centerX(),bounds.bottom-100,bounds.centerX(),bounds.top+100,35);Thread.sleep(300);
+        }
+        assertTrue("All 65 posts must remain reachable at the bottom",device.hasObject(By.text("模拟投稿 1")));
+    }
+    @Test public void partialCountsAndCollectionFailureDoNotClaimAllUploadsLoaded()throws Exception{
+        JSONObject feed=store.feed().put("source","public_uploads").put("syncComplete",false).put("loadedCount",30).put("total",95).put("collectionsError","模拟合集接口受限");store.feed(feed);
+        assertTrue(device.wait(Until.hasObject(By.textContains("投稿已读取 30 / 共 95 条（尚未读完）")),3000));
+        assertTrue(device.hasObject(By.textContains("模拟合集接口受限")));assertTrue(device.hasObject(By.text("测试影片 1")));
+    }
+    @Test public void clearingMediaCachesPreservesPersonalLibrary()throws Exception{
+        String key="bili:BV0000000001";store.toggleFavorite(key);store.progress(key,12345);long uid=store.selectedCreator();int creators=store.enabledCreators().size();
+        click(By.desc("播放设置"));UiScrollable settings=new UiScrollable(new UiSelector().scrollable(true));assertTrue(settings.scrollIntoView(new UiSelector().text("缓存管理")));click(By.text("缓存管理"));
+        click(By.text("清理图片和视频缓存"));assertTrue(device.wait(Until.hasObject(By.text("缓存已清理；名单、收藏和观看记录已保留。")),5000));
+        assertTrue(store.favorite(key));assertEquals(12345,store.progress(key));assertEquals(uid,store.selectedCreator());assertEquals(creators,store.enabledCreators().size());assertEquals(30,store.feed().getJSONArray("videos").length());
+        click(By.text("关闭"));click(By.text("取消"));
     }
     @Test public void automaticLaunchDoesNotUseManualOneMinuteCooldown()throws Exception{
         long attempt=store.syncAttempt();Thread.sleep(500);assertEquals(attempt,store.syncAttempt());assertTrue(System.currentTimeMillis()-attempt>110000);

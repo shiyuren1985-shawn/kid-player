@@ -26,26 +26,29 @@ public class BiliClientTest {
     }
     private BiliClient client(long owner) {
         return new BiliClient(path->{if(path.equals("/x/web-interface/nav"))return nav();
+            if(path.contains("/card?"))return new JSONObject().put("code",0).put("data",new JSONObject().put("card",new JSONObject().put("mid",Long.toString(BiliPolicy.UID)).put("name","测试作者").put("face","")));
+            if(path.contains("seasons_series_list"))return new JSONObject().put("code",0).put("data",new JSONObject().put("items_lists",new JSONObject().put("page",new JSONObject().put("total",0)).put("seasons_list",new JSONArray()).put("series_list",new JSONArray())));
             assertTrue(path.startsWith("/x/space/wbi/arc/search?"));assertTrue(path.contains("mid=402576555"));assertTrue(path.contains("w_rid="));
-            return new JSONObject().put("code",0).put("data",new JSONObject().put("list",new JSONObject().put("vlist",new JSONArray().put(row(owner)).put(row(owner)))));});
+            return new JSONObject().put("code",0).put("data",new JSONObject().put("page",new JSONObject().put("pn",1).put("ps",30).put("count",1)).put("list",new JSONObject().put("vlist",new JSONArray().put(row(owner)))));});
     }
+    private JSONObject sync(BiliClient client)throws Exception{return client.syncCatalog(new JSONObject().put("schema",1).put("uid",BiliPolicy.UID).put("syncedAt",0).put("videos",new JSONArray()),true,f->{});}
     private JSONObject detail(long uid) throws Exception {
         return new JSONObject().put("code",0).put("data",new JSONObject().put("bvid",ID).put("state",0).put("rights",new JSONObject().put("pay",0))
             .put("owner",new JSONObject().put("mid",uid)).put("pages",new JSONArray().put(new JSONObject().put("cid",123))));
     }
     @Test public void syncNormalizesAndDeduplicatesOnlyApprovedCreator() throws Exception {
-        JSONObject feed=client(BiliPolicy.UID).sync();assertEquals(1,BiliClient.items(feed).size());assertTrue(BiliClient.contains(feed,ID));
+        JSONObject feed=sync(client(BiliPolicy.UID));assertEquals(1,BiliClient.items(feed).size());assertTrue(BiliClient.contains(feed,ID));
         assertTrue(BiliClient.items(feed).get(0).online);assertEquals("bili:"+ID,BiliClient.items(feed).get(0).key());
         assertFalse(BiliClient.contains(feed,"BV1yy411c7mD"));
-        assertThrows(IllegalArgumentException.class,()->client(123).sync());
+        assertThrows(IllegalArgumentException.class,()->sync(client(123)));
     }
     @Test public void platformDenialStopsWithoutFallback() throws Exception {
         int[] count={0};BiliClient client=new BiliClient(path->{count[0]++;return new JSONObject("{\"code\":-352,\"message\":\"fixture denial\"}");});
-        Exception error=assertThrows(java.io.IOException.class,client::sync);assertTrue(error.getMessage().contains("-352"));assertEquals(1,count[0]);
+        Exception error=assertThrows(java.io.IOException.class,()->sync(client));assertTrue(error.getMessage().contains("-352"));assertEquals(1,count[0]);
     }
     @Test public void corruptedFeedCannotOverwriteLastGoodCache() throws Exception {
         AppStore store=new AppStore(InstrumentationRegistry.getInstrumentation().getTargetContext());
-        JSONObject good=client(BiliPolicy.UID).sync();store.feed(good);
+        JSONObject good=sync(client(BiliPolicy.UID));store.feed(good);
         JSONObject bad=new JSONObject(good.toString()).put("uid",123);
         assertThrows(IllegalArgumentException.class,()->store.feed(bad));assertEquals(good.toString(),store.feed().toString());
         JSONObject corrupt=new JSONObject(good.toString());corrupt.getJSONArray("videos").getJSONObject(0).put("uid",123);
@@ -72,7 +75,7 @@ public class BiliClientTest {
     }
     @Test public void onlineUiShowsStaleWarningWithoutSearchOrWebView() throws Exception {
         Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();AppStore store=new AppStore(context);
-        store.prefs.edit().clear().commit();store.feed(client(BiliPolicy.UID).sync());store.online(true);
+        store.prefs.edit().clear().commit();store.feed(sync(client(BiliPolicy.UID)));store.online(true);
         store.prefs.edit().putLong("bili.attempt",System.currentTimeMillis()).putString("bili.error","测试限制 -352（模拟响应）").commit();
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         Intent launch=context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);context.startActivity(launch);

@@ -19,7 +19,16 @@ final class RemoteImages {
     private static final LruCache<String,Bitmap> MEMORY=new LruCache<String,Bitmap>(12*1024*1024) {
         protected int sizeOf(String key,Bitmap bitmap){return bitmap.getByteCount();}
     };
+    private static final java.util.concurrent.atomic.AtomicBoolean REGISTERED=new java.util.concurrent.atomic.AtomicBoolean();
+    static void trimMemory(){MEMORY.evictAll();}
+    static long diskBytes(Context context){File[] files=new File(context.getCacheDir(),"creator-images").listFiles();long size=0;if(files!=null)for(File f:files)size+=f.length();return size;}
+    static void clear(Context context)throws IOException{trimMemory();File[] files=new File(context.getCacheDir(),"creator-images").listFiles();if(files!=null)for(File f:files)if(!f.delete()&&f.exists())throw new IOException("Image cache could not be removed");}
     static void load(ImageView view,String url) {
+        if(REGISTERED.compareAndSet(false,true))view.getContext().getApplicationContext().registerComponentCallbacks(new android.content.ComponentCallbacks2(){
+            public void onConfigurationChanged(android.content.res.Configuration config){}
+            public void onLowMemory(){trimMemory();}
+            public void onTrimMemory(int level){if(level>=android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)trimMemory();}
+        });
         view.setTag(url);
         if(url==null || url.isEmpty())return;
         try{BiliPolicy.imageUrl(url);}catch(Exception ignored){return;}
