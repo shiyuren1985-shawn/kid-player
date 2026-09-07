@@ -1,8 +1,8 @@
 # kid player Mac Mini 接收回执
 
-接收记录时间：2026-09-07T11:19:31+08:00，Asia/Shanghai。
+首次源码/环境接收：2026-09-07T11:19:31+08:00。归档补齐及开发交接闭环：2026-09-07T11:43:40+08:00，Asia/Shanghai。
 
-接收状态：PARTIAL / NOT ACCEPTED。源码和构建环境已接收并验证；历史 ZIP 与 MANIFEST.json 未取得，不能写证据齐全的 ACCEPTED。更名工作与归档缺项分开记录。
+开发交接状态：ACCEPTED。源码、构建环境和完整历史归档均已接收并验证。此状态仅表示开发交接完成，不代表签名迁移、家庭设备播放或自动更新已验收。此前历史归档缺失导致的 PARTIAL 已解除。
 
 ## 主机、路径和源码
 
@@ -12,20 +12,24 @@
 - 任务绑定目录：`/Volumes/ZHITAI/AI/KidPlayer`；源码：`/Volumes/ZHITAI/AI/KidPlayer/kid-player`。
 - origin：`https://github.com/shiyuren1985-shawn/kid-player.git`；GitHub API 确认 `private=true`、默认分支 main。
 - clone 基线 HEAD：`6e21db28a5a77612581a7ab9d39a4bc368aeb837`，与交接消息要求一致，接收时工作区干净。
-- 更名提交包含本回执，使用 `git log -1 --format=%H -- docs/handoff/RECEIPT-MAC-MINI.md` 定位；推送后远端 HEAD 由接收任务独立读回核对。
+- 已验证并推送的更名/环境提交：`6f62d8e2ebfcf964d5c7a8bfae93c53d3103459f`。补齐归档前 HEAD 仍为此提交，工作区干净。本次仅修改此回执；回执提交用 `git log -1 --format=%H -- docs/handoff/RECEIPT-MAC-MINI.md` 定位，推送后独立读回远端 HEAD 核对。
 - GitHub CLI 已安装，版本 2.98.0；用户完成设备授权，API 与 clone 已验证。没有复制 Air 凭据或签名私钥。
 
-## 历史归档缺项
+## 历史归档接收（PASS）
 
-- 历史包：`qa/handoff-20260907/sisi-cinema-handoff-20260907.zip`。
-- 交接消息给定预期 SHA256：`a095909d7127e6b3599952a3ce77d8933495efeb5d78e3fd9a9dd3e10f34fa4d`。
-- 认证后仓库 Releases API 列表为空，`releases/tags/handoff-20260907` 返回 HTTP 404；本次未下载到 ZIP。
-- 实际 ZIP SHA256、MANIFEST.json 哈希、逐文件清单校验：NOT TESTED（文件未取得）。
-- 历史 ZIP、APK 和 QA 引用保留原名/原 SHA，仅作为历史证据；未假称 Air 历史测试在 Mini 重跑通过。
+- 私人 prerelease：`https://github.com/shiyuren1985-shawn/kid-player/releases/tag/handoff-20260907-kid-player`；实际 API 核对 `draft=false`、`prerelease=true`，3 个资产均为 `uploaded`。
+- 实际 ZIP 路径：`/Volumes/ZHITAI/AI/KidPlayer/historical-handoffs/handoff-20260907-kid-player/kid-player-handoff-20260907.zip`。
+- ZIP 实际大小：19,729,336 字节；实际 SHA256：`a095909d7127e6b3599952a3ce77d8933495efeb5d78e3fd9a9dd3e10f34fa4d`，与交接预期、GitHub 服务端 digest 和 SHA256SUMS 一致。
+- Release 附件清单：同目录 `MANIFEST.json`；实际 SHA256：`0070cf58b332f9ec9b815e97dc5dff26aefeba99bf38499466ef7391b2300dde`。
+- 独立解压目录：同目录 `extracted/`；包内 `extracted/MANIFEST.json` 与 Release 附件清单 SHA256 一致。
+- 执行包内 `extracted/verify-handoff.py`：`Verified 95 files; source commit c3442f4bcc5c301ca054e6dc91c3d243dbec8f7f`；95 个文件存在性、大小及 SHA256 全部 PASS。
+- 另执行 `git bundle verify`：`sisi-cinema.bundle is okay`，包含完整历史；未向开发仓库导入 refs 或检出旧源码。
+- ZIP 仅外层文件名更名，内部旧名称、旧基线 `c3442f4` 和历史 APK 保留原样，作为历史证据。历史 `KidPlayer/` 源码独立保存，未覆盖当前 `6f62d8e` 开发仓库。
+- 此前 Releases 为空、旧标签 `handoff-20260907` 返回 404 的缺项已由上述新归档解决。未重新要求用户提供归档。
 
 ## 环境和验证
 
-环境详情与复现命令见 `MINI-ENVIRONMENT.md`。JDK 17.0.20.1、Gradle 8.11.1、Build Tools 35.0.0、Platform Tools 37.0.1、Android Platform35、Emulator37.1.11 和 API31 ARM64 镜像均在外置盘；复用系统 Python3.9.6，impacket0.13.1 虚拟环境在项目内。未安装 Android Studio。
+以下为已完成的 Mini 验证记录；本次仅接收历史归档，未重复构建、单元/仪器测试或视觉检查。环境详情与复现命令见 `MINI-ENVIRONMENT.md`。JDK 17.0.20.1、Gradle 8.11.1、Build Tools 35.0.0、Platform Tools 37.0.1、Android Platform35、Emulator37.1.11 和 API31 ARM64 镜像均在外置盘；复用系统 Python3.9.6，impacket0.13.1 虚拟环境在项目内。未安装 Android Studio。
 
 - `./gradlew assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug`：PASS。
 - 单元测试：13 项，0 失败、0 错误、0 跳过。
@@ -54,4 +58,4 @@
 
 未来约定 `/kid-player/update.json`、`/kid-player/releases/kid-player-<version>.apk`、`/kid-player/creators.json`，真实域名仍待用户提供。未实现自动更新、操作 Cloudflare/DNS、发布 APK 或公开文件。GitHub 仅 PRIVATE 源码和交接归档。
 
-待用户提供历史交接归档后补做 ZIP/清单验证；长期签名与家庭实机验收仍需后续独立完成。
+历史归档及清单已完整收到并验证，无资料接收阻塞。后续由 Mini 单端继续开发，Air 仅保留备份。剩余独立待办：Air 旧签名与 Mini 新签名的兼容迁移、真实家庭设备/SMB/在线播放验收、用户确认实际域名后另行授权的自动更新实现与部署；这些不属于归档缺失。
