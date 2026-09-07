@@ -6,3 +6,7 @@
 - 读取其他 Codex 任务仅取文字摘要，includeOutputs=false，不读取原始历史图片载荷。
 - 构建不等于实际播放验收。仪器测试只能在专用 AVD 运行，使用恢复偏好/网络的包装脚本，不测试家用正式设备。
 - GitHub 仓库必须私人；不要提交密钥、真实设备偏好或签名私钥。App 更新目标是个人域名和 Cloudflare，GitHub 仅用于私人源码和交接归档。
+
+- 显示名称为精确小写 `kid player`，仓库与新产物 slug 为 `kid-player`。保持 `applicationId=family.kidcinema`、存储键及签名兼容性；历史 ZIP/APK/QA 原名原 SHA 保留。
+- Mini 源码位于 `/Volumes/ZHITAI/AI/KidPlayer/kid-player`，新增环境和缓存默认位于相邻外置盘 `runtime`；先 source tools/env.sh，不提交本机凭据和签名文件。
+- 未来路径为 `/kid-player/update.json`、`/kid-player/releases/kid-player-<version>.apk`、`/kid-player/creators.json`，域名待用户提供；更名授权不包含实现更新或部署。

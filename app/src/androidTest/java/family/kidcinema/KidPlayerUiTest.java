@@ -7,7 +7,7 @@ import org.json.*;
 import org.junit.*;
 import static org.junit.Assert.*;
 
-public class SisiUiTest {
+public class KidPlayerUiTest {
     private AppStore store;private UiDevice device;
     @Before public void before()throws Exception{
         Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();store=new AppStore(c);store.prefs.edit().clear().commit();store.online(true);store.mode("电视");device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());Configurator.getInstance().setWaitForIdleTimeout(500);
@@ -15,7 +15,7 @@ public class SisiUiTest {
         store.feed(new JSONObject().put("schema",1).put("uid",BiliPolicy.UID).put("syncedAt",System.currentTimeMillis()).put("source","public_collections").put("collectionCount",1).put("videos",videos));
         store.prefs.edit().putLong("bili.attempt",System.currentTimeMillis()-120000).commit();
         c.startActivity(c.getPackageManager().getLaunchIntentForPackage(c.getPackageName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
-        assertTrue(device.wait(Until.hasObject(By.text("思思影院")),8000));
+        assertTrue(device.wait(Until.hasObject(By.text("kid player")),8000));
     }
     @After public void after(){device.pressHome();store.prefs.edit().clear().commit();}
     private void click(BySelector selector){UiObject2 v=device.wait(Until.findObject(selector),5000);assertNotNull(selector.toString(),v);v.click();}

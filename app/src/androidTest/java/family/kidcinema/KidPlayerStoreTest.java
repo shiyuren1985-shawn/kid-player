@@ -8,12 +8,12 @@ import java.util.*;
 import static org.junit.Assert.*;
 
 /** Only synthetic documents and injected HTTP responses; no VPS or new real creators. */
-public class SisiStoreTest {
+public class KidPlayerStoreTest {
     private AppStore store;
     @Before public void before(){store=new AppStore(InstrumentationRegistry.getInstrumentation().getTargetContext());store.prefs.edit().clear().commit();}
     @After public void after(){store.prefs.edit().clear().commit();}
     private JSONObject document(String rows)throws Exception{return new JSONObject("{\"schema\":1,\"creators\":"+rows+"}");}
-    private boolean sync(JSONObject doc)throws Exception{store.prefs.edit().putLong("remote.attempt",0).commit();return RemoteConfig.refresh(store,"https://example.com/sisi.json",true,url->doc);}
+    private boolean sync(JSONObject doc)throws Exception{store.prefs.edit().putLong("remote.attempt",0).commit();return RemoteConfig.refresh(store,"https://example.com/kid-player/creators.json",true,url->doc);}
     @Test public void cloudIsDefaultAndLocalUidEditsCannotChangeIt()throws Exception{
         assertTrue(store.remoteCreators());assertEquals(402576555L,store.selectedCreator());
         assertThrows(IllegalStateException.class,()->store.addCreator(new AppStore.Creator(123,"测试作者","",true)));

@@ -1,6 +1,6 @@
-# 思思影院 · Android 原型
+# kid player · Android 原型
 
-项目统一位置：`/Users/shawn/AI/KidPlayer`。源码、调试 APK、启动脚本、开发辅助文件和素材/检查记录均在此目录内。Android Studio、Android SDK、JDK 和模拟器镜像仍使用系统级安装位置，不跟随项目搬迁。
+当前私人仓库：`https://github.com/shiyuren1985-shawn/kid-player`。Mini 源码目录：`/Volumes/ZHITAI/AI/KidPlayer/kid-player`；新增环境和缓存位于相邻外置盘 `runtime/`，Python 虚拟环境位于 `tools/.venv`。开发只在 Mini 单端进行。
 
 用于观看家长指定范围的视频。一个 APK 包含触控平板布局与电视遥控器布局，保留本地演示与 SMB，并新增实验性 B 站指定 UP 主订阅。
 
@@ -14,25 +14,25 @@
 
 当前版本 `0.5.0-easy-player` / versionCode 6。操作参考了 YouTube 的[片尾视频选择与自动播放说明](https://support.google.com/youtube/answer/6327615?hl=en-GB)，本应用采用手动选择同作者影片。
 
-验证：13 项单元测试通过；完整模拟器回归 49 项中 47 项通过、2 项在线首播超时，这两项随后在同一 APK 上单独重测通过。遥控器暂停后的焦点、真实同作者切换、三部视频的音视频解码/跳转/暂停恢复、离线重试和 SMB 均有通过记录。在线首播偶发超时的根因尚未确认。检查记录见 `qa/sisi-0.5.0/development-review.md`、`verification.json` 和 `visual-review.md`；APK 保存在 `qa/releases/0.5.0-easy-player/`。
+Air 历史验证（不代表 Mini 本次验收）：13 项单元测试通过；完整模拟器回归 49 项中 47 项通过、2 项在线首播超时，这两项随后在同一 APK 上单独重测通过。遥控器暂停后的焦点、真实同作者切换、三部视频的音视频解码/跳转/暂停恢复、离线重试和 SMB 均有通过记录。在线首播偶发超时的根因尚未确认。检查记录见 `qa/sisi-0.5.0/development-review.md`、`verification.json` 和 `visual-review.md`；APK 保存在 `qa/releases/0.5.0-easy-player/`。
 
 下面的 0.4 及更早内容为历史记录，与上面的当前交互不同时以 0.5 为准。
 
-## 0.4 云端名单与思思影院（2026-09-05）
+## 0.4 云端名单与kid player（2026-09-05）
 
-应用现名“思思影院”，奶油白、莓果粉和淡紫配色，保留爱心萌可图标。默认由你自己的 HTTPS JSON 文件管理 UP 主名单；App 只配置文件地址，云端模式下不能在本机增删 UID。可选“本机管理”使用独立名单。你还没有提供文件地址，当前初始名单仍只有画渣花小烙。
+当前统一名称为“kid player”，奶油白、莓果粉和淡紫配色，保留爱心萌可图标。默认由你自己的 HTTPS JSON 文件管理 UP 主名单；App 只配置文件地址，云端模式下不能在本机增删 UID。可选“本机管理”使用独立名单。你还没有提供文件地址，当前初始名单仍只有画渣花小烙。
 
-文件示例见 [config/sisi-creators.example.json](config/sisi-creators.example.json)，完整接入说明见 [config/README.md](config/README.md)。无需 Mac 常开，也无需先部署专用管理后台。
+文件示例见 [config/kid-player-creators.example.json](config/kid-player-creators.example.json)，完整接入说明见 [config/README.md](config/README.md)。无需 Mac 常开，也无需先部署专用管理后台。
 
 - 首页按 UP 主头像分类；点头像只显示该作者的影片，支持多个作者、启用/停用和移除。同步成功后使用平台头像与视频封面；图片失败有占位。
 - 每位作者分别保存目录、喜欢与观看进度。原作者已有记录保留。仍限每位作者公开合集最新 30 条，不能保证覆盖全部投稿。
 - 云端文件整份校验成功才生效；下载或格式错误保留上次名单。空名单明确停用全部作者。在播作者被停用会结束播放。
 - 首页使用可复用影片列表，刷新时保留缓存；喜欢操作留在详情，返回保留列表位置。电视使用清晰的焦点边框，放大字体时导航可换行。
 - 家庭存储的喜欢和继续观看跨已访问文件夹汇总，并隔离不同连接目录。播放加入音频焦点处理、耳机断开暂停、等待反馈和超时重试。
-- 当前调试版本 `0.4.0-sisi` / versionCode 5，沿用包名和调试签名以保留已有数据。真实 VPS 地址和实际华为/TCL 设备仍待接入验收。
+- 当时调试版本 `0.4.0-sisi` / versionCode 5，沿用包名和调试签名以保留已有数据。真实 VPS 地址和实际华为/TCL 设备仍待接入验收。
 - 验证记录：`qa/sisi-0.4.0/development-review.md` 和 `verification.json`。最终 13 项单元测试和 44 项仪器测试全部通过，共 57 项，联网 opt-in 已开启，无跳过。真实音视频解码、暂停、跳转、断网恢复和音频焦点已在专用模拟器验证。
 
-以下 0.3 / 0.2 内容是历史记录；与上述当前行为不同的部分以 0.4 为准。
+以下旧版本内容是历史记录；当前行为以开头的 0.5.0 说明及本次更名接收回执为准。
 
 ## 0.3 可用的公开合集自动同步（2026-09-04）
 
@@ -77,13 +77,13 @@
 
 ## 在这台 Mac 上使用
 
-- 双击 `启动思思影院.command`（旧名称脚本也保留）：启动专用 Android 模拟器、安装现有原型并打开。
-- 双击 `更新并运行.command`：重新编译后安装运行，正常更新保留连接设置和观看进度。
-- 首次启动时，macOS 可能询问“终端”访问“文稿”文件夹，因为项目保存在这里；请允许此项访问。无需授予完全磁盘访问权限。如果暂未允许，可先在已有模拟器中体验，稍后再运行脚本。
-- 项目可以用 `/Applications/Android Studio.app` 打开。SDK：`/Users/shawn/Library/Android/sdk`。
-- Java 17 使用 Homebrew 的项目指定路径；没有更改 shell 配置或其他项目的默认 Java。换电脑时应修改 `gradle.properties` 的 `org.gradle.java.home`，以及 `tools/env.sh`。
+- 双击 `启动kid-player.command`：启动专用 Android 模拟器、安装现有原型并打开。
+- 双击 `构建并运行kid-player.command`：重新编译后安装运行，正常更新保留连接设置和观看进度。
+- 项目和开发环境均在外置盘，运行前先挂载外置盘。
+- 使用命令行即可构建；Android Studio 按需安装，IDE 应选择本机 JDK 17 与外置盘 SDK。
+- 先 `source tools/env.sh`；用 `KID_PLAYER_RUNTIME`、`JAVA_HOME`、`ANDROID_HOME` 覆盖本机环境路径，不再提交 Air 的绝对 Java 路径。
 - 模拟器是通用 Android ARM64 平板，不是 HarmonyOS 模拟器，也不是 TCL 固件模拟器。电视布局模式仅验证交互布局，不能证明真实 TCL 兼容。
-- 默认模拟器是 `KidCinema_Tablet_12`（Android 12 / API 31）。旧的 `KidCinema_Tablet`（Android 11）保留作兼容排查，但不用于日常演示：该 ARM64 镜像复现了[已记录的暂停解码错误](https://github.com/google/ExoPlayer/issues/10576)。启动脚本固定使用新版，不改变真机的解码器选择。
+- 默认模拟器是 `KidCinema_Tablet_12`（Android 12 / API 31）。Air 的旧 `KidCinema_Tablet`（Android 11）仅保留历史兼容排查说明，Mini 不建立该 AVD：该 ARM64 镜像复现了[已记录的暂停解码错误](https://github.com/google/ExoPlayer/issues/10576)。启动脚本固定使用新版，不改变真机的解码器选择。
 
 终端运行：
 
@@ -101,7 +101,7 @@ APK 在 `app/build/outputs/apk/debug/app-debug.apk`。这是本地调试签名�
 - 可真正播放的 18 秒本地原创 H.264 演示视频，四张不同封面共用这段视频，界面明确说明；视频无音轨。
 - 播放、暂停、进度拖动、前后跳转；离开页面或进入后台保存进度并释放播放器。
 - 平板/电视/自动模式。电视使用方向键、确认和返回，焦点显示深紫或白色边框。
-- 按用户指定使用爱心萌可主题的生成式角色图标与电视入口图，应用名为“思思影院”。这是家庭自用原型素材，不是官方授权标识；若以后公开分发，应另行确认角色授权或换成原创角色。
+- 按用户指定使用爱心萌可主题的生成式角色图标与电视入口图，应用名为“kid player”。这是家庭自用原型素材，不是官方授权标识；若以后公开分发，应另行确认角色授权或换成原创角色。
 - 按用户要求不设置儿童密码或家长 PIN；“播放设置”直接打开。SMB 共享本身若需要账号密码，仍需填写连接凭据，并使用 Android Keystore AES-GCM 加密保存，关闭系统备份及设备迁移。
 - SMB2/3 读取，支持账号密码、指定共享与相对根目录；不实现写入、删除或其他共享的浏览界面。
 - 所有列目录、开文件和播放都经过相对路径检查；拒绝父目录穿越、绝对地址、替代数据流及已识别的符号链接/重解析点。
@@ -137,6 +137,9 @@ source tools/env.sh
 ```bash
 source tools/env.sh
 ./gradlew assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug
+python3 -m venv tools/.venv
+tools/.venv/bin/python -m pip install -r tools/requirements.txt
+# 首次运行前先通过启动脚本安装并启动应用，让包装脚本可备份初始偏好。
 python3 tools/test-emulator.py
 # 包含真实平台播放和片尾候选切换的完整回归，会访问 B 站
 python3 tools/test-emulator.py --live
@@ -162,3 +165,11 @@ python3 tools/test-emulator.py --live
 - `tools/generate-demo.swift`：原创演示视频生成脚本。
 
 第三方组件：AndroidX Media3、SMBJ（Apache-2.0）、Bouncy Castle、SLF4J，以及仅用于测试的 Impacket。依赖版本固定在构建文件中；正式交付前应再次核验许可证和安全更新。
+
+## 名称、历史证据与未来路径
+
+显示名称精确为 `kid player`，仓库、脚本和新交付产物 slug 为 `kid-player`。旧 `sisi-cinema` ZIP、历史 APK、历史版本号及 `qa/sisi-*` 引用保留原名和原 SHA，仅作历史证据。历史 QA 不在 Git 源码中，须从交接归档取得；本次接收状态见 `docs/handoff/RECEIPT-MAC-MINI.md`。
+
+`applicationId=family.kidcinema`、存储键保持不变。Mini 的新调试签名不能覆盖 Air 的旧调试签名包，不得卸载清数据冒充升级成功。`bash tools/package.sh` 将调试构建导出至 `output/releases/kid-player-<version>-debug.apk`；Gradle 内部中间输出仍使用标准 `app-debug.apk`。
+
+未来个人域名与 Cloudflare 路径为 `/kid-player/update.json`、`/kid-player/releases/kid-player-<version>.apk` 和独立的 `/kid-player/creators.json`。真实域名待用户提供，更新模块尚未实现，本次不部署。GitHub 仅用于私人源码和交接归档。

@@ -8,7 +8,7 @@ parser.add_argument('--class',dest='classes',default='')
 parser.add_argument('--live',action='store_true')
 parser.add_argument('--no-fixture',action='store_true')
 args=parser.parse_args()
-ADB=pathlib.Path(os.environ.get('ANDROID_HOME','/Users/shawn/Library/Android/sdk'))/'platform-tools/adb'
+ADB=pathlib.Path(os.environ['ANDROID_HOME'])/'platform-tools/adb'
 serial='emulator-5554'
 def adb(*parts, **kwargs):
     return subprocess.run([str(ADB),'-s',serial,*parts],check=True,**kwargs)
@@ -16,7 +16,7 @@ def text(*parts):
     return adb(*parts,stdout=subprocess.PIPE).stdout.decode().strip()
 if text('emu','avd','name').splitlines()[0].strip()!='KidCinema_Tablet_12':
     raise SystemExit('Refusing to test any device other than KidCinema_Tablet_12')
-folder=ROOT/'qa'/'sisi-0.5.0'/('run-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
+folder=ROOT/'qa'/'kid-player-0.5.0'/('run-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
 folder.mkdir(parents=True)
 # Preserve the existing delivery install's settings before installing a new test build.
 adb('shell','am','force-stop','family.kidcinema',stdout=subprocess.DEVNULL)

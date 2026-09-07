@@ -170,8 +170,8 @@ public class MainActivity extends Activity {
         int width=getResources().getConfiguration().screenWidthDp;boolean wide=width>=780;float scale=getResources().getConfiguration().fontScale;
         shell=column();shell.setBackgroundColor(BG);shell.setPadding(dp(20),dp(12),dp(20),dp(12));
         shell.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(dp(20)+insets.getSystemWindowInsetLeft(),dp(12)+insets.getSystemWindowInsetTop(),dp(20)+insets.getSystemWindowInsetRight(),dp(12)+insets.getSystemWindowInsetBottom());return insets;});
-        LinearLayout header=row();ImageView icon=new ImageView(this);icon.setImageResource(R.mipmap.ic_launcher);icon.setContentDescription("思思影院");header.addView(icon,new LinearLayout.LayoutParams(dp(48),dp(48)));
-        LinearLayout brand=column();brand.setPadding(dp(12),0,dp(8),0);brand.addView(text("思思影院",25,INK,true));if(width>600)brand.addView(text("把喜欢的故事，留给思思",13,MUTED,false));header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
+        LinearLayout header=row();ImageView icon=new ImageView(this);icon.setImageResource(R.mipmap.ic_launcher);icon.setContentDescription("kid player");header.addView(icon,new LinearLayout.LayoutParams(dp(48),dp(48)));
+        LinearLayout brand=column();brand.setPadding(dp(12),0,dp(8),0);brand.addView(text("kid player",25,INK,true));if(width>600)brand.addView(text("把喜欢的故事，留给你",13,MUTED,false));header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
         Button settings=button("播放设置",false,this::settings);settings.setTag("settings");settings.setContentDescription("播放设置");header.addView(settings);shell.addView(header);space(shell,16);
         LinearLayout body=wide?row():column();body.setGravity(Gravity.TOP);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         nav=wide?column():row();int navWidth=Math.round(190+Math.max(0,scale-1)*80);
@@ -311,7 +311,7 @@ public class MainActivity extends Activity {
         TextView demo=text("本地演示为同一段 18 秒静音短片。",14,MUTED,false);panel.addView(demo);
         Runnable display=()->{int value=sources.getCheckedRadioButtonId();onlinePanel.setVisibility(value==R.id.source_online?View.VISIBLE:View.GONE);smbPanel.setVisibility(value==R.id.source_smb?View.VISIBLE:View.GONE);demo.setVisibility(value==R.id.source_demo?View.VISIBLE:View.GONE);};sources.setOnCheckedChangeListener((g,id)->display.run());display.run();
         space(panel,18);panel.addView(text("界面模式",16,INK,true));Spinner modes=new Spinner(this);String[] names={"自动","平板","电视"};modes.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));modes.setSelection(Math.max(0,Arrays.asList(names).indexOf(store.mode())));modes.setContentDescription("界面模式");panel.addView(modes,new LinearLayout.LayoutParams(-1,dp(56)));
-        space(panel,10);panel.addView(text("思思影院 0.5.0 · 家庭自用原型",13,MUTED,false));
+        space(panel,10);panel.addView(text("kid player 0.5.0 · 家庭自用原型",13,MUTED,false));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("播放设置").setView(scroll).setPositiveButton("保存",null).setNegativeButton("取消",null).create();
         dialog.setOnDismissListener(d->{if(testing[0]!=null)testing[0].cancel(true);if(!isDestroyed())render();});dialog.show();dialog.getWindow().setLayout(Math.min(dp(650),getResources().getDisplayMetrics().widthPixels-dp(32)),(int)(getResources().getDisplayMetrics().heightPixels*.88));
         dialog.getButton(-1).setOnClickListener(v->{int source=sources.getCheckedRadioButtonId();try{
@@ -341,7 +341,7 @@ public class MainActivity extends Activity {
     private void localCreators(Runnable onChanged){
         if(store.remoteCreators()){toast("云端名单请在网上的文件中修改");return;}
         ScrollView scroll=new ScrollView(this);LinearLayout panel=column();panel.setPadding(dp(22),dp(12),dp(22),dp(16));scroll.addView(panel);
-        panel.addView(text("选择思思可以观看的 UP 主。停用或移除后，其视频不再显示；观看记录保留在本机。",14,MUTED,false));
+        panel.addView(text("选择可以观看的 UP 主。停用或移除后，其视频不再显示；观看记录保留在本机。",14,MUTED,false));
         LinearLayout creators=column();panel.addView(creators);
         Runnable[] draw={null};draw[0]=()->{creators.removeAllViews();for(AppStore.Creator creator:store.creators()){
             space(creators,12);LinearLayout card=row();ImageView avatar=picture(creator.avatar,50);card.addView(avatar,new LinearLayout.LayoutParams(dp(50),dp(50)));

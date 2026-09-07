@@ -1,4 +1,4 @@
-# 思思影院：Mac Mini 开发交接
+# kid player：Mac Mini 开发交接
 
 交接日期：2026-09-07。来源：Shawn MacBook Air，项目 `/Users/shawn/AI/KidPlayer`。接收目标：用户 24 小时运行的 Mac Mini 上的 Codex。
 
@@ -11,13 +11,13 @@
 
 ## 当前代码和产品
 
-私人仓库：`https://github.com/shiyuren1985-shawn/sisi-cinema`。当前交接提交：`c3442f4bcc5c301ca054e6dc91c3d243dbec8f7f`。此前产品代码提交：`3cc4e718f6831d64727c31b02b819a0363f56d0f`。版本 `0.5.0-easy-player`，versionCode 6，包名 `family.kidcinema`。
+私人仓库：`https://github.com/shiyuren1985-shawn/kid-player`。Mini 接收基线提交：`6e21db28a5a77612581a7ab9d39a4bc368aeb837`；旧交接文档提交：`c3442f4bcc5c301ca054e6dc91c3d243dbec8f7f`。此前产品代码提交：`3cc4e718f6831d64727c31b02b819a0363f56d0f`。版本 `0.5.0-easy-player`，versionCode 6，包名 `family.kidcinema`。
 
-名称思思影院，奶油白/粉/淡紫。视频卡片直接播放；72dp 常驻返回、播放/暂停、收藏、关闭影院；播放完重放和最多四部同 UP 主视频，手动选择下一部。作者名单默认通过用户 HTTPS JSON 文件管理，本机模式独立可选；点头像切换作者。原有本地演示、只读 SMB、收藏、观看进度保留，无 PIN。
+名称 `kid player`，奶油白/粉/淡紫。视频卡片直接播放；72dp 常驻返回、播放/暂停、收藏、关闭影院；播放完重放和最多四部同 UP 主视频，手动选择下一部。作者名单默认通过用户 HTTPS JSON 文件管理，本机模式独立可选；点头像切换作者。原有本地演示、只读 SMB、收藏、观看进度保留，无 PIN。
 
 初始指定 UP 主为 UID 402576555。在线目录仍限制为作者公开合集最新 30 条，并不保证全部投稿。没有账号登录或付费视频支持。更新功能和 UP 名单是两个文件/用途，不混淆。
 
-## 已验证和限制
+## Air 历史已验证和限制（不代表 Mini 本次验证）
 
 - 13 项单元测试通过；Lint 0 错误、32 警告。
 - 49 项完整仪器测试：47 通过，2 项在线首播超时；失败项在同一当时 APK 上分别实播重测通过，首播偶发超时根因未确认。
@@ -28,7 +28,7 @@
 
 ## 接收与环境
 
-1. 克隆私人仓库，确认 HEAD 为 `c3442f4bcc5c301ca054e6dc91c3d243dbec8f7f`。不要覆盖 Mini 上可能存在的旧项目；如有旧目录先比较提交和未提交文件。
+1. 克隆私人仓库，核对接收基线 `6e21db28a5a77612581a7ab9d39a4bc368aeb837`，之后更名提交以实际 Git 日志和接收回执为准。不要覆盖 Mini 上可能存在的旧项目；如有旧目录先比较提交和未提交文件。
 2. 解压配套 handoff ZIP 到单独目录，按 MANIFEST.json 验证文件 SHA。其中包含 git bundle、当前 APK、测试资料和交接文档。未包含真实设备偏好备份、个人凭据、签名私钥、SDK/JDK/Gradle 缓存和虚拟环境。
 3. Mini 使用自己的 JDK17、Android SDK（compileSdk35/build-tools35），检查 `tools/env.sh`、`gradle.properties` 和 `tools/run.sh` 中 Air 路径；调整本机路径后再构建。Mac Mini 用户目录未核实，不可直接假定为 /Users/shawn。
 4. `./gradlew assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug`。SMB 测试需要在 Mini 重建 `tools/.venv` 并安装 impacket。只在专用 KidCinema_Tablet_12 AVD 跑包装测试 `python3 tools/test-emulator.py`；`--live` 才允许访问真实 B 站。不得在家用正式设备清偏好跑仪器测试。
@@ -41,6 +41,16 @@
 
 ## 下一步更新功能
 
-推荐固定 HTTPS `/sisi/update.json` 与版本化 `releases/*.apk`。清单含 versionCode/versionName、APK URL、大小、SHA256、更新说明。启动自动检查（限频）、设置页手动检查、不打断播放；下载进度/取消/失败重试、文件及包身份签名校验、系统安装确认。先部署 APK 再发布清单，Cloudflare 清单不缓存，APK 文件名版本化。首次须手动安装一次带更新模块的兼容签名版本，之后 App 内更新。
+约定个人域名 HTTPS `/kid-player/update.json` 与版本化 `/kid-player/releases/kid-player-<version>.apk`，作者名单独立为 `/kid-player/creators.json`。清单含 versionCode/versionName、APK URL、大小、SHA256、更新说明。启动自动检查（限频）、设置页手动检查、不打断播放；下载进度/取消/失败重试、文件及包身份签名校验、系统安装确认。先部署 APK 再发布清单，Cloudflare 清单不缓存，APK 文件名版本化。首次须手动安装一次带更新模块的兼容签名版本，之后 App 内更新。
 
 用户将继续在 Mini Codex 指示开发；本次交接接收任务只验证环境与交接，不自动部署域名、发布公开文件或开始未确认的新功能。
+
+## Mini 更名与接收约定
+
+当前任务为「kid player 开发（Mac Mini）」。绑定目录保留 `/Volumes/ZHITAI/AI/KidPlayer`，源码在其下 `kid-player`；JDK 17、SDK、Gradle 缓存、临时文件和 AVD 在相邻 `runtime`。先 `source tools/env.sh`，必要时用环境变量覆盖路径；不再使用 Air 的固定 Java/SDK 路径。Python 虚拟环境在 `tools/.venv`。
+
+仅 Mini 修改代码。显示名称精确小写 `kid player`，路径 slug 为 `kid-player`；保留 `family.kidcinema`、存储键和签名兼容性，专用 AVD 标识仍为 `KidCinema_Tablet_12`。启动入口为 `启动kid-player.command` 和 `构建并运行kid-player.command`；导出调试 APK 用 `bash tools/package.sh`。
+
+历史交接包 `qa/handoff-20260907/sisi-cinema-handoff-20260907.zip` 预期 SHA256 为 `a095909d7127e6b3599952a3ce77d8933495efeb5d78e3fd9a9dd3e10f34fa4d`。旧 ZIP 和历史 APK 均保留原名、原 SHA，不因更名重写历史证据。下载后才可记录已收到；必须验证 ZIP 与 MANIFEST.json，缺包时源码可继续但接收不能标为证据齐全。
+
+本次允许名称及交接环境适配、相关测试和私人源码提交推送，不实现自动更新功能或部署个人域名。Mini 本次证据见 `RECEIPT-MAC-MINI.md`。

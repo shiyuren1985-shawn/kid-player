@@ -16,7 +16,7 @@ public class PrototypeTest {
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         Configurator.getInstance().setWaitForIdleTimeout(500);
         Intent launch=context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());launch.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK|Intent.FLAG_ACTIVITY_NEW_TASK);context.startActivity(launch);
-        assertNotNull(device.wait(Until.findObject(By.text("思思影院")),10000));
+        assertNotNull(device.wait(Until.findObject(By.text("kid player")),10000));
         assertNotNull(device.findObject(By.textContains("本地演示")));
         click(device,By.text("▶  播放演示短片"));
         UiObject2 fullscreenTip=device.wait(Until.findObject(By.text("Got it")),1500);
@@ -44,7 +44,7 @@ public class PrototypeTest {
         assertEquals("Later pause holds position",heldLater,store.progress("demo:sample-0"));
         assertFalse("Later pause must not trigger decoder error",device.hasObject(By.text("这段视频暂时无法播放")));
         // Player must actually move through the local MP4, not merely show a mock screen.
-        device.pressBack();device.wait(Until.hasObject(By.text("思思影院")),5000);
+        device.pressBack();device.wait(Until.hasObject(By.text("kid player")),5000);
         assertTrue("Real playback progress saved",store.progress("demo:sample-0")>1000);
         click(device,By.text("▷  继续观看"));
         assertNotNull(device.wait(Until.findObject(By.text("小火箭去旅行")),5000));
