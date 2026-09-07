@@ -183,11 +183,11 @@ public class PlayerActivity extends Activity {
     private android.graphics.drawable.GradientDrawable buttonBackground(boolean focused){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(MainActivity.PANEL);d.setCornerRadius(dp(16));if(focused)d.setStroke(dp(4),MainActivity.FOCUS);return d;}
     private Button action(String label,String description,Runnable action){Button b=new Button(this);b.setText(label);b.setContentDescription(description);b.setTextSize(22);b.setTextColor(MainActivity.INK);b.setAllCaps(false);b.setMinHeight(dp(72));b.setMinimumHeight(dp(72));b.setMaxLines(2);b.setPadding(dp(12),dp(12),dp(12),dp(12));b.setBackground(buttonBackground(false));b.setOnFocusChangeListener((v,focus)->v.setBackground(buttonBackground(focus)));b.setOnClickListener(v->action.run());return b;}
     private void icon(Button button,int resource,int color){
-        android.graphics.drawable.Drawable drawable=getDrawable(resource).mutate();drawable.setTint(color);drawable.setBounds(0,0,dp(40),dp(40));
-        button.setCompoundDrawablesRelative(null,drawable,null,null);button.setCompoundDrawablePadding(dp(6));
+        android.graphics.drawable.Drawable drawable=getDrawable(resource).mutate();drawable.setTint(color);drawable.setBounds(0,0,dp(28),dp(28));
+        button.setCompoundDrawablesRelative(drawable,null,null,null);button.setCompoundDrawablePadding(dp(6));
     }
     private Button iconAction(String label,String description,int resource,int tint,int fill,Runnable command){
-        Button button=action(label,description,command);button.setTextSize(20);button.setGravity(Gravity.CENTER);button.setMinHeight(dp(112));button.setMinimumHeight(dp(112));
+        Button button=action(label,description,command);button.setTextSize(18);button.setGravity(Gravity.CENTER);button.setMinHeight(dp(56));button.setMinimumHeight(dp(56));button.setPadding(dp(12),dp(8),dp(12),dp(8));
         button.setTypeface(null,android.graphics.Typeface.BOLD);icon(button,resource,tint);
         java.util.function.Consumer<Boolean> background=focused->{android.graphics.drawable.GradientDrawable shape=buttonBackground(focused);shape.setColor(fill);button.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x22000000),shape,null));};
         background.accept(false);button.setOnFocusChangeListener((v,focused)->background.accept(focused));return button;
