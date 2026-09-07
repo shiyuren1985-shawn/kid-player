@@ -6,16 +6,15 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/** Experimental, anonymous adapter. A platform denial is terminal for this attempt. */
+/** Anonymous adapter using the app browser session. A platform denial ends this attempt. */
 public final class BiliClient {
     interface Transport { JSONObject get(String path) throws Exception; }
     private final Transport transport;
     private final long uid;
     public BiliClient() {this(BiliPolicy.UID);}
     private volatile boolean cancelled;
-    private final java.util.Set<HttpURLConnection> requests=java.util.concurrent.ConcurrentHashMap.newKeySet();
-    public BiliClient(long uid) {this.uid=BiliPolicy.creatorUid(uid);this.transport=this::request;}
-    public void cancel() {cancelled=true;for(HttpURLConnection connection:requests)connection.disconnect();}
+    public BiliClient(long uid) {this.uid=BiliPolicy.creatorUid(uid);this.transport=path->BiliSession.get(path,()->cancelled);}
+    public void cancel() {cancelled=true;}
     BiliClient(Transport transport) {this(BiliPolicy.UID,transport);}
     BiliClient(long uid,Transport transport) {this.uid=BiliPolicy.creatorUid(uid);this.transport=transport;}
     public AppStore.Creator profile() throws Exception {
@@ -27,27 +26,9 @@ public final class BiliClient {
     }
     static final String REFERER="https://www.bilibili.com/";
     static final String UA="Mozilla/5.0";
-    private JSONObject request(String path) throws Exception {
-        if(cancelled)throw new java.io.InterruptedIOException();
-        if(!path.startsWith("/x/"))throw new IOException("接口地址无效");
-        HttpURLConnection connection=(HttpURLConnection)new URL("https://api.bilibili.com"+path).openConnection();
-        requests.add(connection);
-        connection.setConnectTimeout(12000);connection.setReadTimeout(12000);connection.setInstanceFollowRedirects(false);
-        connection.setRequestProperty("User-Agent",UA);connection.setRequestProperty("Referer",REFERER);
-        try {
-            if(cancelled||Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException();
-            int status=connection.getResponseCode();
-            if(status!=200)throw new IOException("B 站暂未允许访问（HTTP "+status+"）。未跳转或尝试绕过限制。");
-            try(InputStream in=connection.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
-                byte[] buffer=new byte[8192];int n;
-                while((n=in.read(buffer))!=-1){if(cancelled||Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException();if(out.size()+n>2_000_000)throw new IOException("接口响应过大");out.write(buffer,0,n);}
-                try{return new JSONObject(out.toString(StandardCharsets.UTF_8.name()));}
-                catch(JSONException e){throw new IOException("B 站返回了无法识别的响应。");}
-            }
-        } finally {requests.remove(connection);connection.disconnect();}
-    }
     static JSONObject data(JSONObject response) throws Exception {
         int code=response.getInt("code");
+        if(BiliAccessException.riskCode(code))throw new BiliAccessException(code);
         if(code!=0)throw new IOException("B 站接口未允许本次请求（"+code+"）"+
             ((code==-352||code==-403)?"：访问或风控限制。":"：可能需要登录、视频已下架或接口已变化。")+"不会打开 B 站网页。");
         return response.getJSONObject("data");
@@ -57,13 +38,14 @@ public final class BiliClient {
     }
     JSONObject api(String path)throws Exception{return transport.get(path);}
     private String uploadImageKey,uploadSubKey;
+    private long uploadKeysAt;
     JSONObject uploadPage(int page)throws Exception{
         if(page<1)throw new IOException("投稿页码无效");
-        if(uploadImageKey==null){
+        if(uploadImageKey==null||System.currentTimeMillis()-uploadKeysAt>30000){
             JSONObject nav=transport.get("/x/web-interface/nav");if(nav.getInt("code")!=0&&nav.getInt("code")!=-101)data(nav);
-            JSONObject keys=nav.getJSONObject("data").getJSONObject("wbi_img");uploadImageKey=imageKey(keys.getString("img_url"));uploadSubKey=imageKey(keys.getString("sub_url"));
+            JSONObject keys=nav.getJSONObject("data").getJSONObject("wbi_img");uploadImageKey=imageKey(keys.getString("img_url"));uploadSubKey=imageKey(keys.getString("sub_url"));uploadKeysAt=System.currentTimeMillis();
         }
-        Map<String,String> params=new HashMap<>();params.put("mid",Long.toString(uid));params.put("pn",Integer.toString(page));params.put("ps","30");params.put("order","pubdate");
+        Map<String,String> params=new HashMap<>();params.put("mid",Long.toString(uid));params.put("pn",Integer.toString(page));params.put("ps","30");params.put("order","pubdate");params.put("keyword","");params.put("tid","0");params.put("platform","web");params.put("order_avoided","true");params.put("web_location","1550101");
         JSONObject response=data(transport.get("/x/space/wbi/arc/search?"+BiliPolicy.signedQuery(params,uploadImageKey,uploadSubKey,System.currentTimeMillis()/1000)));
         JSONObject paging=response.getJSONObject("page");int total=paging.getInt("count");
         if(total<0||paging.getInt("pn")!=page||paging.getInt("ps")!=30)throw new IOException("投稿分页信息无效。");

@@ -19,7 +19,7 @@ public final class AppStore {
     private final Context context;
     private String cachedConnection, cachedScope;
     public static final String KEY = "kidcinema.connection.v1";
-    public AppStore(Context c) { context=c.getApplicationContext();prefs = c.getSharedPreferences("cinema", Context.MODE_PRIVATE); }
+    public AppStore(Context c) { context=c.getApplicationContext();BiliSession.configure(context);prefs = c.getSharedPreferences("cinema", Context.MODE_PRIVATE); }
     public static final class Config {
         public String host = "", share = "", root = "", user = "", password = "", domain = "";
         public int port = 445;

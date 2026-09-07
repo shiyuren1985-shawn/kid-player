@@ -22,3 +22,9 @@
 - [Android Media3：Caching media](https://developer.android.com/media/media3/exoplayer/network-stacks#caching-media)：使用 SimpleCache、CacheDataSource 和有限容量淘汰，缓存播放读取的字节。
 - [Media3：CacheKeyFactory](https://developer.android.com/reference/androidx/media3/datasource/cache/CacheKeyFactory)：缓存键识别资源，不能随读取区间变化。应用使用默认 URI 键，Range/seek 共享同一资源缓存。
 - [RFC 9111：HTTP Caching](https://www.rfc-editor.org/rfc/rfc9111.html)：区分 HTTP 新鲜度、校验和 no-store。版本化 APK 与不缓存更新清单按服务器策略分开；图片/Media3 是应用资源缓存，不宣称自写实现是完整 RFC 9111 HTTP 缓存。
+
+## 0.7.1 同步补充
+
+元数据请求使用应用私有的正常匿名 WebView 会话，不改变视频 LRU、URL 缓存键和播放时权限检查。首次目录每轮最多 150 条，续传核对头页与边界；24 小时内优先增量衔接，到期后下一轮全量核对。服务未提供快照标识，同数量的中间条目在续传期间改变仍可能延后到下一轮完整核对才发现。合集成员的一日缓存也用于普通手动刷新。
+
+风控后持久化全作者同步冷却，30 分钟到 12 小时递增；缓存、名单、收藏、观看记录保留。元数据同步冷却不主动中断已经开始的视频播放。

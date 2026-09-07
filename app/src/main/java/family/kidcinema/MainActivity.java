@@ -135,7 +135,7 @@ public class MainActivity extends Activity {
     private void onCreatorsChanged(String key){
         if(key==null)return;
         if(key.startsWith("creators"))handler.post(()->{if(foreground&&store.online()&&!knownCreators.equals(creatorSignature())){capture();cancelLoad();items=new ArrayList<>();refreshCreator(false);}});
-        if(store.online()&&store.selectedCreator()>0&&(key.equals(store.biliKey(store.selectedCreator(),"feed"))||key.equals(store.biliKey(store.selectedCreator(),"error"))||key.equals(store.biliKey(store.selectedCreator(),"attempt")))){handler.removeCallbacks(feedChanged);handler.postDelayed(feedChanged,100);}
+        if(store.online()&&store.selectedCreator()>0&&(key.equals(store.biliKey(store.selectedCreator(),"feed"))||key.equals(store.biliKey(store.selectedCreator(),"error"))||key.equals(store.biliKey(store.selectedCreator(),"attempt"))||key.equals("bili.riskUntil"))){handler.removeCallbacks(feedChanged);handler.postDelayed(feedChanged,100);}
     }
     private void refreshCreator(boolean manual){
         knownCreators=creatorSignature();long uid=store.selectedCreator();
@@ -157,10 +157,12 @@ public class MainActivity extends Activity {
     private void online(){capture();cancelLoad();store.online(true);folder="";section="全部影片";items=new ArrayList<>();error="";refreshOnline(false);}
     private boolean catalogBusy(){return loading||(store.online()&&BiliSync.running(store.selectedCreator()));}
     private String onlineStatus(){
+        if(BiliSync.riskCooling(store))return BiliSync.riskMessage(store);
         if(store.selectedCreator()==0)return store.remoteCreators()?"请在云端文件配置作者，再读取名单。":"请在播放设置添加并启用 UP 主。";
         try{org.json.JSONObject feed=store.feed();
             if(feed.has("total"))return (feed.optBoolean("syncComplete")?"全部投稿 "+feed.getInt("total")+" 条":"投稿已读取 "+feed.optInt("loadedCount")+" / 共 "+feed.getInt("total")+" 条（尚未读完）")
-                +(feed.optLong("syncedAt")>0?" · 上次完整更新 "+new java.text.SimpleDateFormat("MM-dd HH:mm",Locale.CHINA).format(new Date(feed.getLong("syncedAt"))):"");
+                +("paused".equals(feed.optString("phase"))?" · 已保存进度，稍后继续":"")
+                +(feed.optLong("syncedAt")>0?" · 上次同步 "+new java.text.SimpleDateFormat("MM-dd HH:mm",Locale.CHINA).format(new Date(feed.getLong("syncedAt"))):"");
             return "缓存目录 "+feed.getJSONArray("videos").length()+" 条 · 待核对全部投稿";
         }catch(Exception e){return "目录暂不可用";}
     }
@@ -178,6 +180,7 @@ public class MainActivity extends Activity {
         org.json.JSONObject c=chosenCollection();return c==null?"包含全部公开投稿，未加入合集的视频也会显示。":"合集："+c.optString("name")+" · 显示其中属于这位作者的投稿";
     }
     private String emptyCatalogMessage(){
+        if(BiliSync.riskCooling(store))return BiliSync.riskMessage(store);
         if(store.selectedCreator()==0)return store.remoteCreators()?"请在云端文件配置作者，再读取名单。":"请在播放设置添加并启用 UP 主。";
         if(!error.isEmpty())return "视频暂未加载成功，请查看上方原因，稍后重试。";
         if(chosenCollection()!=null)return "这个合集暂没有匹配到已读取的作者投稿。";
