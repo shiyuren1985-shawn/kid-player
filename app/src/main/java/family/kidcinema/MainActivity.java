@@ -21,6 +21,16 @@ public class MainActivity extends Activity {
     private AppStore store;
     private LinearLayout shell,nav;
     private RecyclerView list;
+    private LinearLayout searchPanel;
+    private ImageView brandIcon;
+    private EditText searchInput;
+    private String searchQuery="", searchFingerprint="";
+    private boolean searchAll=false, searching=false;
+    private int searchRevision=0;
+    private CatalogSearch.Result searchResult;
+    private Future<?> searchTask;
+    private final ExecutorService searchIo=Executors.newSingleThreadExecutor();
+    private final Runnable searchChanged=()->{render();};
     private GridLayoutManager layout;
     private Cards adapter;
     private List<LibraryItem> items=new ArrayList<>(),visible=new ArrayList<>();
@@ -43,20 +53,20 @@ public class MainActivity extends Activity {
         String anchor="header",focus="";int index,offset;
     }
     @Override public void onCreate(Bundle state) {
-        super.onCreate(state);store=new AppStore(this);knownCreators=creatorSignature();store.prefs.registerOnSharedPreferenceChangeListener(creatorChanges);
+        super.onCreate(state);store=new AppStore(this);try{LauncherIcons.reconcile(this,store);}catch(RuntimeException ignored){}knownCreators=creatorSignature();store.prefs.registerOnSharedPreferenceChangeListener(creatorChanges);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        if(state!=null){folder=state.getString("folder","");section=state.getString("section","全部影片");if(section.equals("我的喜欢"))section="我的收藏";if(section.equals("继续观看"))section="观看历史";
+        if(state!=null){searchQuery=state.getString("searchQuery","");searchAll=state.getBoolean("searchAll",false);folder=state.getString("folder","");section=state.getString("section","全部影片");if(section.equals("我的喜欢"))section="我的收藏";if(section.equals("继续观看"))section="观看历史";
             Position p=new Position();p.anchor=state.getString("anchor","header");p.focus=state.getString("focus","");p.index=state.getInt("index");p.offset=state.getInt("offset");positions.put(page(),p);}
         refresh(false);
     }
-    @Override protected void onResume(){super.onResume();handler.postDelayed(()->{if(foreground)AppUpdater.home(this);},1200);foreground=true;if(list!=null){render();if(store.online()&&!loading)refreshOnline(false);}handler.removeCallbacks(autoSync);handler.postDelayed(autoSync,BiliPolicy.INTERVAL_MS);}
+    @Override protected void onResume(){super.onResume();handler.postDelayed(()->{if(foreground)AppUpdater.home(this);},1200);foreground=true;if(brandIcon!=null)brandIcon.setImageResource(LauncherIcons.selected(store).image);if(list!=null){render();if(store.online()&&!loading)refreshOnline(false);}handler.removeCallbacks(autoSync);handler.postDelayed(autoSync,BiliPolicy.INTERVAL_MS);}
     @Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);if(hasFocus&&list!=null&&tv){Position p=positions.get(shownPage);if(p!=null&&!p.focus.isEmpty())restoreFocus(renderGeneration,p.focus,0);}}
     @Override protected void onPause(){foreground=false;if(!playbackReturnFocus.isEmpty())leftForPlayback=true;capture();handler.removeCallbacks(autoSync);super.onPause();}
-    @Override protected void onSaveInstanceState(Bundle state){capture();super.onSaveInstanceState(state);state.putString("folder",folder);state.putString("section",section);Position p=positions.get(page());if(p!=null){state.putString("anchor",p.anchor);state.putString("focus",p.focus);state.putInt("index",p.index);state.putInt("offset",p.offset);}}
+    @Override protected void onSaveInstanceState(Bundle state){capture();super.onSaveInstanceState(state);state.putString("searchQuery",searchQuery);state.putBoolean("searchAll",searchAll);state.putString("folder",folder);state.putString("section",section);Position p=positions.get(page());if(p!=null){state.putString("anchor",p.anchor);state.putString("focus",p.focus);state.putInt("index",p.index);state.putInt("offset",p.offset);}}
     @Override public void onConfigurationChanged(Configuration config){capture();super.onConfigurationChanged(config);layoutSignature="";render();}
-    @Override protected void onDestroy(){store.prefs.unregisterOnSharedPreferenceChangeListener(creatorChanges);cancelLoad();io.shutdownNow();settingsIo.shutdownNow();handler.removeCallbacksAndMessages(null);super.onDestroy();}
+    @Override protected void onDestroy(){store.prefs.unregisterOnSharedPreferenceChangeListener(creatorChanges);cancelLoad();io.shutdownNow();settingsIo.shutdownNow();searchIo.shutdownNow();handler.removeCallbacksAndMessages(null);super.onDestroy();}
     private int dp(float value){return Math.round(value*getResources().getDisplayMetrics().density);}
-    private String page(){return store.scope()+"|"+section+"|"+(section.equals("全部影片")?folder:"");}
+    private String page(){return store.scope()+"|"+section+"|"+(section.equals("全部影片")?folder:"")+(searchActive()?"|search:"+searchAll+":"+searchQuery:"");}
     private LinearLayout column(){LinearLayout v=new LinearLayout(this);v.setOrientation(LinearLayout.VERTICAL);return v;}
     private LinearLayout row(){LinearLayout v=new LinearLayout(this);v.setGravity(Gravity.CENTER_VERTICAL);return v;}
     private TextView text(String label,int size,int color,boolean bold){TextView v=new TextView(this);v.setText(label);v.setTextSize(size);v.setTextColor(color);if(bold)v.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return v;}
@@ -134,6 +144,7 @@ public class MainActivity extends Activity {
     };
     private void onCreatorsChanged(String key){
         if(key==null)return;
+        if(key.startsWith("creators")||(key.startsWith("bili.")&&key.endsWith("feed"))){handler.post(()->{searchRevision++;if(searchActive())render();});}
         if(key.startsWith("creators"))handler.post(()->{if(foreground&&store.online()&&!knownCreators.equals(creatorSignature())){capture();cancelLoad();items=new ArrayList<>();refreshCreator(false);}});
         if(store.online()&&store.selectedCreator()>0&&(key.equals(store.biliKey(store.selectedCreator(),"feed"))||key.equals(store.biliKey(store.selectedCreator(),"error"))||key.equals(store.biliKey(store.selectedCreator(),"attempt"))||key.equals("bili.riskUntil"))){handler.removeCallbacks(feedChanged);handler.postDelayed(feedChanged,100);}
     }
@@ -187,7 +198,22 @@ public class MainActivity extends Activity {
         try{if(store.feed().optBoolean("syncComplete"))return "该作者目前没有公开投稿。";}catch(Exception ignored){}
         return "尚未加载这位作者的视频，请点击刷新。";
     }
+    private boolean searchActive(){return store.online()&&section.equals("全部影片")&&!searchQuery.trim().isEmpty();}
+    private void ensureSearch(){
+        String fingerprint=searchAll+":"+store.selectedCreator()+":"+searchRevision+":"+searchQuery;
+        if(fingerprint.equals(searchFingerprint))return;
+        searchFingerprint=fingerprint;searchResult=null;searching=true;
+        if(searchTask!=null)searchTask.cancel(true);
+        String query=searchQuery;boolean all=searchAll;long uid=store.selectedCreator();
+        searchTask=searchIo.submit(()->{CatalogSearch.Result result=CatalogSearch.search(store,query,all,uid);
+            runOnUiThread(()->{if(isDestroyed()||!fingerprint.equals(searchFingerprint))return;searchResult=result;searching=false;render();});});
+    }
     private List<LibraryItem> filtered(){
+        if(searchActive()){
+            ensureSearch();List<LibraryItem> found=new ArrayList<>();
+            if(searchResult!=null)for(LibraryItem item:searchResult.videos)if(store.allowedCreator(item.creatorUid))found.add(item);
+            return found;
+        }
         if(section.equals("观看历史"))return store.watchHistory(items);
         if(!store.online()&&!store.demo()&&!section.equals("全部影片"))return store.history(section.equals("我的收藏"));
         Set<String> members=null;
@@ -204,15 +230,15 @@ public class MainActivity extends Activity {
         String signature=config.screenWidthDp+":"+tv+":"+config.fontScale;
         visible=filtered();
         if(list==null || !signature.equals(layoutSignature)){layoutSignature=signature;buildShell();}
-        shownPage=page();buildNav();adapter.data=new ArrayList<>(visible);adapter.notifyDataSetChanged();restore();
+        searchPanel.setVisibility(store.online()&&section.equals("全部影片")?View.VISIBLE:View.GONE);shownPage=page();buildNav();adapter.data=new ArrayList<>(visible);adapter.notifyDataSetChanged();restore();
     }
     private void buildShell(){
         int width=getResources().getConfiguration().screenWidthDp;boolean wide=width>=780;float scale=getResources().getConfiguration().fontScale;
         shell=column();shell.setBackgroundColor(BG);shell.setPadding(dp(20),dp(12),dp(20),dp(12));
         shell.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(dp(20)+insets.getSystemWindowInsetLeft(),dp(12)+insets.getSystemWindowInsetTop(),dp(20)+insets.getSystemWindowInsetRight(),dp(12)+insets.getSystemWindowInsetBottom());return insets;});
-        LinearLayout header=row();ImageView icon=new ImageView(this);icon.setImageResource(R.mipmap.ic_launcher);icon.setContentDescription("kid player");header.addView(icon,new LinearLayout.LayoutParams(dp(48),dp(48)));
+        LinearLayout header=row();ImageView icon=new ImageView(this);brandIcon=icon;icon.setImageResource(LauncherIcons.selected(store).image);icon.setContentDescription("kid player");header.addView(icon,new LinearLayout.LayoutParams(dp(48),dp(48)));
         LinearLayout brand=column();brand.setPadding(dp(12),0,dp(8),0);brand.addView(text("kid player",25,INK,true));if(width>600)brand.addView(text("把喜欢的故事，留给你",13,MUTED,false));header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
-        Button settings=button("播放设置",false,this::settings);settings.setTag("settings");settings.setContentDescription("播放设置");header.addView(settings);shell.addView(header);space(shell,16);
+        Button settings=button("播放设置",false,this::settings);settings.setTag("settings");settings.setContentDescription("播放设置");header.addView(settings);shell.addView(header);space(shell,10);buildSearchPanel();shell.addView(searchPanel);space(shell,6);
         LinearLayout body=wide?row():column();body.setGravity(Gravity.TOP);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         nav=wide?column():row();int navWidth=Math.round(190+Math.max(0,scale-1)*80);
         if(wide){ScrollView navScroll=new ScrollView(this);navScroll.addView(nav);body.addView(navScroll,new LinearLayout.LayoutParams(dp(navWidth),-1));}
@@ -221,7 +247,25 @@ public class MainActivity extends Activity {
         int available=width-40-(wide?navWidth+18:0);int minCard=scale>=1.3f?300:240;int columns=Math.max(1,Math.min(4,available/minCard));
         layout=new GridLayoutManager(this,columns);layout.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup(){public int getSpanSize(int position){return position==0?columns:1;}});list.setLayoutManager(layout);
         adapter=new Cards();list.setAdapter(adapter);body.addView(list,wide?new LinearLayout.LayoutParams(0,-1,1):new LinearLayout.LayoutParams(-1,0,1));
-        setContentView(shell);shell.requestApplyInsets();
+        shell.setFocusableInTouchMode(true);setContentView(shell);shell.requestFocus();shell.requestApplyInsets();
+    }
+    private void clearSearch(){
+        searchInput.setText("");handler.removeCallbacks(searchChanged);
+        ((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(searchInput.getWindowToken(),0);
+        searchInput.clearFocus();shell.requestFocus();render();
+    }
+    private void buildSearchPanel(){
+        searchPanel=column();searchPanel.setPadding(0,0,0,dp(6));
+        LinearLayout entry=row();searchInput=new EditText(this);searchInput.setSingleLine(true);searchInput.setTextSize(17);searchInput.setHint("搜索视频标题");searchInput.setContentDescription("搜索视频关键词");searchInput.setTag("search:input");searchInput.setText(searchQuery);searchInput.setSelectAllOnFocus(false);
+        searchInput.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);searchInput.setPadding(dp(14),dp(8),dp(14),dp(8));searchInput.setBackground(bg(Color.WHITE,12));
+        entry.addView(searchInput,new LinearLayout.LayoutParams(0,dp(52),1));
+        Button clear=button("清除",false,this::clearSearch);clear.setContentDescription("清除搜索关键词");LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-2,dp(52));cp.setMargins(dp(8),0,0,0);entry.addView(clear,cp);searchPanel.addView(entry);
+        RadioGroup scopes=new RadioGroup(this);scopes.setOrientation(LinearLayout.HORIZONTAL);int current=View.generateViewId(),all=View.generateViewId();
+        RadioButton here=new RadioButton(this);here.setId(current);here.setText("当前 UP 主");here.setTextSize(15);here.setMinHeight(dp(44));scopes.addView(here);
+        RadioButton every=new RadioButton(this);every.setId(all);every.setText("全部订阅");every.setTextSize(15);every.setMinHeight(dp(44));scopes.addView(every);scopes.check(searchAll?all:current);searchPanel.addView(scopes);
+        scopes.setOnCheckedChangeListener((group,id)->{capture();searchAll=id==all;searchFingerprint="";render();});
+        searchInput.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence value,int start,int count,int after){}public void onTextChanged(CharSequence value,int start,int before,int count){capture();searchQuery=value.toString();handler.removeCallbacks(searchChanged);handler.postDelayed(searchChanged,180);}public void afterTextChanged(android.text.Editable value){}});
+        searchInput.setOnEditorActionListener((view,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH){handler.removeCallbacks(searchChanged);render();((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(searchInput.getWindowToken(),0);return true;}return false;});
     }
     private void buildNav(){
         nav.removeAllViews();boolean wide=getResources().getConfiguration().screenWidthDp>=780;
@@ -240,7 +284,7 @@ public class MainActivity extends Activity {
                 TextView name=text((selected?"✓ ":"")+creator.name,tv?16:14,selected?GREEN:INK,true);name.setMaxLines(2);name.setGravity(Gravity.CENTER);name.setEllipsize(android.text.TextUtils.TruncateAt.END);author.addView(name);author.setOnClickListener(v->selectCreator(creator.uid));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(tv?140:124),-2);p.setMargins(0,0,dp(8),0);row.addView(author,p);
             }
             authors.addView(row);box.addView(authors);space(box,12);
-            if(section.equals("全部影片")){
+            if(section.equals("全部影片")&&!searchActive()){
                 LinearLayout filters=row();Button all=button("全部投稿",folder.isEmpty(),this::allPosts);all.setTag("filter:all");filters.addView(all);
                 if(collections().length()>0){Button groups=button(chosenCollection()==null?"合集（"+collections().length()+"）":"当前合集",!folder.isEmpty(),this::chooseCollection);groups.setTag("filter:collections");LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-2,-2);fp.setMargins(dp(10),0,0,0);filters.addView(groups,fp);}
                 box.addView(filters);space(box,10);
@@ -249,6 +293,7 @@ public class MainActivity extends Activity {
         }
         LinearLayout titleRow=row();String title=section;
         if(section.equals("全部影片")){if(store.online()){AppStore.Creator c=store.creator(store.selectedCreator());title=chosenCollection()!=null?chosenCollection().optString("name"):c==null?"我的 UP 主":c.name+"的全部投稿";}else if(!folder.isEmpty())title=folder.substring(folder.lastIndexOf('/')+1);}
+        if(searchActive())title="搜索结果"+(searching?"":" · "+visible.size()+" 个视频");
         titleRow.addView(text(title,tv?24:22,INK,true),new LinearLayout.LayoutParams(0,-2,1));
         if(section.equals("观看历史")){
             Button clear=button("清空观看历史",false,()->new AlertDialog.Builder(this).setTitle("清空观看历史？")
@@ -258,20 +303,24 @@ public class MainActivity extends Activity {
         }
         if(!store.online()&&!folder.isEmpty() && section.equals("全部影片"))titleRow.addView(button("‹ 上一层",false,this::up));
         if(catalogBusy()){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setTag("sync:progress");spinner.setContentDescription("正在更新目录");spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(GREEN));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(24),dp(24));sp.setMargins(0,0,dp(10),0);titleRow.addView(spinner,sp);}
-        Button refresh=button(catalogBusy()?"更新中":"刷新",false,this::refresh);refresh.setTag("refresh");refresh.setEnabled(!catalogBusy());titleRow.addView(refresh);box.addView(titleRow);space(box,6);
-        box.addView(text(store.online()?onlineStatus():store.demo()?"4 种封面 · 共用 1 段 18 秒静音演示片":section.equals("全部影片")?"当前文件夹 · 可进入子文件夹":"允许目录内的全部"+section,13,MUTED,false));
+        Button refresh=button(catalogBusy()?"更新中":searchActive()?"刷新当前 UP":"刷新",false,this::refresh);refresh.setTag("refresh");refresh.setEnabled(!catalogBusy());titleRow.addView(refresh);box.addView(titleRow);space(box,6);
+        if(searchActive()){
+            String scope=searchAll?"全部订阅":store.creator(store.selectedCreator())==null?"当前 UP 主":store.creator(store.selectedCreator()).name;
+            box.addView(text(searching?"正在搜索本机目录…":scope+" · 标题包含“"+searchQuery.trim()+"”",14,MUTED,false));
+            if(searchResult!=null)box.addView(text(searchResult.creators==0?"暂无可搜索的 UP 主，请先添加或启用订阅。":searchResult.incomplete>0?"已搜索 "+searchResult.creators+" 位 UP 主的本机目录；其中 "+searchResult.incomplete+" 位投稿尚未加载完整，可切换作者后刷新。":"已搜索完整缓存目录；新投稿需刷新后才能搜到。",13,MUTED,false));
+        }else box.addView(text(store.online()?onlineStatus():store.demo()?"4 种封面 · 共用 1 段 18 秒静音演示片":section.equals("全部影片")?"当前文件夹 · 可进入子文件夹":"允许目录内的全部"+section,13,MUTED,false));
         if(section.equals("观看历史")){space(box,6);box.addView(text("当前"+(store.online()?" UP 主":"视频来源")+" · 最近看过的 30 个视频 · 看完也保留",13,MUTED,false));}
-        if(store.online()&&section.equals("全部影片")){space(box,6);box.addView(text(catalogScope(),13,MUTED,false));if(store.remoteCreators()&&!store.prefs.getString("remote.error","").isEmpty())box.addView(text("云端名单更新未完成，保留上次名单。",13,ERROR,false));}
+        if(store.online()&&section.equals("全部影片")&&!searchActive()){space(box,6);box.addView(text(catalogScope(),13,MUTED,false));if(store.remoteCreators()&&!store.prefs.getString("remote.error","").isEmpty())box.addView(text("云端名单更新未完成，保留上次名单。",13,ERROR,false));}
         if(catalogBusy()){space(box,8);box.addView(text(store.online()?(items.isEmpty()?"正在读取全部投稿…":"正在分批更新，已缓存影片可以继续观看…"):"正在读取家庭存储…",14,GREEN,false));}
         if(!error.isEmpty()){space(box,8);TextView failure=text((store.online()?(items.isEmpty()?"暂未加载到视频\n":"本次更新未完成，保留上次目录\n"):"")+error,14,ERROR,false);box.addView(failure);}
-        if(section.equals("全部影片")&&!visible.isEmpty()){
+        if(section.equals("全部影片")&&!searchActive()&&!visible.isEmpty()){
             LibraryItem pick=null;for(LibraryItem i:visible)if(!i.folder&&store.progress(i.key())>0){pick=i;break;}if(pick==null)for(LibraryItem i:visible)if(!i.folder){pick=i;break;}
             if(pick!=null){final LibraryItem item=pick;space(box,12);LinearLayout banner=row();banner.setPadding(dp(16),dp(12),dp(16),dp(12));banner.setBackground(bg(PANEL,18));
                 LinearLayout words=column();words.addView(text(store.progress(item.key())>0?"继续这个故事":"今天想看这一部吗？",14,GREEN,true));TextView name=text(item.name,16,INK,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);words.addView(name);banner.addView(words,new LinearLayout.LayoutParams(0,-2,1));
                 Button play=button(store.demo()?"▶  播放演示短片":store.progress(item.key())>0?"继续播放":"播放",true,()->play(item,false,"hero"));play.setTag("hero");banner.addView(play);box.addView(banner);
             }
         }
-        if(visible.isEmpty()&&!catalogBusy()){space(box,14);String message=section.equals("我的收藏")?"还没有收藏的影片。播放时点一下收藏。":section.equals("观看历史")?"还没有观看历史，播放视频后会记录在这里。":store.online()?emptyCatalogMessage():"这个文件夹还没有影片。";TextView empty=text(message,17,MUTED,false);empty.setPadding(dp(20),dp(24),dp(20),dp(24));empty.setBackground(bg(PANEL,18));box.addView(empty);}
+        if(visible.isEmpty()&&!catalogBusy()&&!(searchActive()&&searching)){space(box,14);String message=searchActive()?"没有找到匹配的视频，试试更短的关键词。":section.equals("我的收藏")?"还没有收藏的影片。播放时点一下收藏。":section.equals("观看历史")?"还没有观看历史，播放视频后会记录在这里。":store.online()?emptyCatalogMessage():"这个文件夹还没有影片。";TextView empty=text(message,17,MUTED,false);empty.setPadding(dp(20),dp(24),dp(20),dp(24));empty.setBackground(bg(PANEL,18));box.addView(empty);}
         return box;
     }
     private final class Cards extends RecyclerView.Adapter<Cards.Holder>{
@@ -287,14 +336,15 @@ public class MainActivity extends Activity {
         LinearLayout card=column();focusStyle(card,Color.WHITE,18);card.setPadding(dp(5),dp(5),dp(5),dp(12));card.setTag("card:"+item.key());card.setContentDescription(item.name+(item.folder?"，文件夹":"，直接播放"));
         if(item.demo)card.addView(new ArtView(this,item.art),new LinearLayout.LayoutParams(-1,dp(132)));else card.addView(picture(item.image,tv?145:135));
         LinearLayout caption=column();caption.setPadding(dp(10),dp(12),dp(10),0);TextView name=text((item.folder?"文件夹 · ":"")+item.name,tv?20:18,INK,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);caption.addView(name);space(caption,6);
-        TextView subtitle=text(item.subtitle,tv?14:13,MUTED,false);subtitle.setMaxLines(2);subtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);caption.addView(subtitle);
-        long progress=store.progress(item.key());if(progress>0){space(caption,5);caption.addView(text("继续 "+time(progress),14,GREEN,true));}if(store.favorite(item.key())){space(caption,5);caption.addView(text("♥  已收藏",14,GREEN,true));}card.addView(caption);
+        TextView subtitle=text(searchActive()&&searchAll&&item.online?(store.creator(item.creatorUid)==null?"UP "+item.creatorUid:store.creator(item.creatorUid).name)+" · "+item.subtitle:item.subtitle,tv?14:13,MUTED,false);subtitle.setMaxLines(2);subtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);caption.addView(subtitle);
+        long progress=store.progress(itemScope(item),item.key());if(progress>0){space(caption,5);caption.addView(text("继续 "+time(progress),14,GREEN,true));}if(store.favorite(itemScope(item),item.key())){space(caption,5);caption.addView(text("♥  已收藏",14,GREEN,true));}card.addView(caption);
         card.setOnClickListener(v->{capture();Position p=positions.get(page());if(p!=null)p.focus="card:"+item.key();if(item.folder){cancelLoad();folder=item.path;items=new ArrayList<>();refresh(false);}else play(item,false);});return card;
     }
     static String time(long ms){long seconds=ms/1000;return String.format(Locale.CHINA,"%02d:%02d",seconds/60,seconds%60);}
+    private String itemScope(LibraryItem item){return item.online?"bili:"+item.creatorUid:store.scope();}
     private void play(LibraryItem item,boolean fromStart){play(item,fromStart,"card:"+item.key());}
     private void play(LibraryItem item,boolean fromStart,String returnFocus){
-        if(item.folder)return;playbackReturnFocus=tv?returnFocus:"";leftForPlayback=false;capture();store.remember(Collections.singletonList(item));
+        if(item.folder)return;playbackReturnFocus=tv?returnFocus:"";leftForPlayback=false;capture();store.remember(itemScope(item),Collections.singletonList(item));
         Intent intent=new Intent(this,PlayerActivity.class).putExtra("online",item.online).putExtra("demo",item.demo).putExtra("path",item.path).putExtra("title",item.name).putExtra("creatorUid",item.creatorUid).putExtra("fromStart",fromStart);startActivity(intent);
     }
     private void up(){capture();cancelLoad();if(folder.isEmpty())return;int i=folder.lastIndexOf('/');folder=i<0?"":folder.substring(0,i);items=new ArrayList<>();refresh(false);}
@@ -332,7 +382,7 @@ public class MainActivity extends Activity {
         }
         return super.dispatchKeyEvent(event);
     }
-    @Override public void onBackPressed(){if(!section.equals("全部影片")){section("全部影片");return;}if(!folder.isEmpty()){if(store.online())allPosts();else up();return;}super.onBackPressed();}
+    @Override public void onBackPressed(){if(searchActive()){clearSearch();return;}if(!section.equals("全部影片")){section("全部影片");return;}if(!folder.isEmpty()){if(store.online())allPosts();else up();return;}super.onBackPressed();}
     private void toast(String value){Toast.makeText(this,value,Toast.LENGTH_LONG).show();}
     private EditText field(LinearLayout panel,String label,String value,String hint,boolean password){panel.addView(text(label,14,INK,true));EditText input=new EditText(this);input.setText(value);input.setHint(hint);input.setTextSize(16);input.setSingleLine(true);input.setContentDescription(label);input.setMinHeight(dp(56));input.setInputType(password?InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD:InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);panel.addView(input,new LinearLayout.LayoutParams(-1,-2));space(panel,10);return input;}
     private void settings(){
@@ -365,6 +415,7 @@ public class MainActivity extends Activity {
         TextView demo=text("本地演示为同一段 18 秒静音短片。",14,MUTED,false);panel.addView(demo);
         Runnable display=()->{int value=sources.getCheckedRadioButtonId();onlinePanel.setVisibility(value==R.id.source_online?View.VISIBLE:View.GONE);smbPanel.setVisibility(value==R.id.source_smb?View.VISIBLE:View.GONE);demo.setVisibility(value==R.id.source_demo?View.VISIBLE:View.GONE);};sources.setOnCheckedChangeListener((g,id)->display.run());display.run();
         space(panel,18);panel.addView(text("界面模式",16,INK,true));Spinner modes=new Spinner(this);String[] names={"自动","平板","电视"};modes.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));modes.setSelection(Math.max(0,Arrays.asList(names).indexOf(store.mode())));modes.setContentDescription("界面模式");panel.addView(modes,new LinearLayout.LayoutParams(-1,dp(56)));
+        space(panel,10);panel.addView(button("选择桌面图标",false,()->startActivity(new Intent(this,IconPickerActivity.class))));
         space(panel,10);panel.addView(button("缓存管理",false,this::cacheSettings));
         space(panel,10);panel.addView(button("检查应用更新",false,()->startActivity(new Intent(this,UpdateActivity.class))));
         panel.addView(text("kid player "+AppUpdater.versionName(this)+" · 家庭自用原型",13,MUTED,false));

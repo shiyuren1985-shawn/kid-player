@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run regression only on the dedicated AVD, restoring settings in a finally block."""
-import argparse, datetime, json, os, pathlib, socket, subprocess, sys, time
+import argparse, datetime, json, os, pathlib, socket, subprocess, sys, time, re, base64, xml.etree.ElementTree as ET
 
 ROOT=pathlib.Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser()
@@ -23,6 +23,24 @@ adb('shell','am','force-stop','family.kidcinema',stdout=subprocess.DEVNULL)
 backup=adb('exec-out','run-as','family.kidcinema','tar','cf','-','shared_prefs',stdout=subprocess.PIPE).stdout
 (folder/'before-prefs.tar').write_bytes(backup);(folder/'before-prefs.tar').chmod(0o600)
 settings={k:text('shell','settings','get',group,k) for group,k in [('global','wifi_on'),('global','mobile_data'),('system','font_scale'),('system','user_rotation'),('system','accelerometer_rotation')]}
+(folder/'before-system-settings.json').write_text(json.dumps(settings,indent=2)+'\n')
+# Component overrides are package-manager state, not included in shared_prefs.
+manifest=ET.parse(ROOT/'app/src/main/AndroidManifest.xml')
+android='{http://schemas.android.com/apk/res/android}'
+aliases=['family.kidcinema'+node.attrib[android+'name'] for node in manifest.findall('.//activity-alias')]
+def component_states():
+    dump=text('shell','dumpsys','package','family.kidcinema')
+    states={alias:'default-state' for alias in aliases};mode=None
+    for line in dump.splitlines():
+        value=line.strip()
+        if value=='enabledComponents:':mode='enable'
+        elif value=='disabledComponents:':mode='disable'
+        elif mode and value in states:states[value]=mode
+        elif mode and not re.fullmatch(r'family\.kidcinema\.[A-Za-z0-9_.$]+',value):mode=None
+    return states
+original_components=component_states()
+(folder/'before-components.json').write_text(json.dumps(original_components,indent=2)+'\n')
+installed=False
 fixture=None; result=None
 try:
     if not args.no_fixture:
@@ -39,6 +57,7 @@ try:
         else:raise RuntimeError('SMB fixture was not ready')
     for path in ['app/build/outputs/apk/debug/app-debug.apk','app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk']:
         adb('install','-r',str(ROOT/path),stdout=subprocess.DEVNULL)
+        installed=True
     cmd=[str(ADB),'-s',serial,'shell','am','instrument','-w']
     if args.classes:cmd+=['-e','class',args.classes]
     if args.live:cmd+=['-e','liveBili','true']
@@ -52,6 +71,11 @@ finally:
     # Replace only preference files created by this test run, restoring the original archive.
     adb('shell','run-as','family.kidcinema','rm','-rf','shared_prefs',stdout=subprocess.DEVNULL)
     adb('shell','run-as','family.kidcinema','tar','xf','-',input=backup,stdout=subprocess.DEVNULL)
+    if installed and original_components:
+        encoded=base64.b64encode(json.dumps(original_components).encode()).decode()
+        cleanup=subprocess.run([str(ADB),'-s',serial,'shell','am','instrument','-w','-e','class','family.kidcinema.LauncherStateRestoreTest','-e','launcherStates',encoded,'family.kidcinema.test/family.kidcinema.SafeTestRunner'],capture_output=True,text=True,timeout=60)
+        (folder/'component-cleanup.txt').write_text(cleanup.stdout+cleanup.stderr)
+        adb('shell','am','force-stop','family.kidcinema',stdout=subprocess.DEVNULL)
     for k,v in settings.items():
         if k=='wifi_on':adb('shell','svc','wifi','enable' if v=='1' else 'disable',stdout=subprocess.DEVNULL)
         elif k=='mobile_data':adb('shell','svc','data','enable' if v=='1' else 'disable',stdout=subprocess.DEVNULL)
@@ -67,8 +91,9 @@ finally:
         with tarfile.open(fileobj=io.BytesIO(data)) as archive:
             return {m.name:hashlib.sha256(archive.extractfile(m).read()).hexdigest() for m in archive.getmembers() if m.isfile()}
     restored=hashes(backup)==hashes(verify)
-    (folder/'restore.json').write_text(json.dumps({'preferences_exactly_restored_before_launch':restored,'original_system_settings':settings,'fixture_stopped':fixture is None or fixture.poll() is not None},indent=2)+'\n')
-    if not restored:raise RuntimeError('Preferences restore verification failed')
+    components_restored=component_states()==original_components
+    (folder/'restore.json').write_text(json.dumps({'preferences_exactly_restored_before_launch':restored,'launcher_components_restored':components_restored,'original_system_settings':settings,'fixture_stopped':fixture is None or fixture.poll() is not None},indent=2)+'\n')
+    if not restored or not components_restored:raise RuntimeError('Preferences or launcher component restore verification failed')
     adb('shell','am','start','-n','family.kidcinema/.MainActivity',stdout=subprocess.DEVNULL)
     print('Evidence:',folder)
 if result is None or result.returncode!=0 or 'FAILURES!!!' in result.stdout or 'OK (' not in result.stdout:

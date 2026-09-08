@@ -202,8 +202,9 @@ public final class AppStore {
     public boolean favorite(String scope,String key) {return prefs.getBoolean("favorite:"+scope+":"+key,false);}
     public void toggleFavorite(String key) {toggleFavorite(scope(),key);}
     public void toggleFavorite(String scope,String key) {prefs.edit().putBoolean("favorite:"+scope+":"+key,!favorite(scope,key)).apply();}
-    public void remember(List<LibraryItem> items) {
-        String key="library:"+scope();
+    public void remember(List<LibraryItem> items) {remember(scope(),items);}
+    public void remember(String scope,List<LibraryItem> items) {
+        String key="library:"+scope;
         try {
             JSONObject index=new JSONObject(prefs.getString(key,"{}"));
             for(LibraryItem item:items)if(!item.folder)index.put(item.key(),item.json());

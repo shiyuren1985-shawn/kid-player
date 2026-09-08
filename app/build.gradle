@@ -7,8 +7,8 @@ android {
         applicationId 'family.kidcinema'
         minSdk 26
         targetSdk 35
-        versionCode = (project.findProperty('kidPlayerVersionCode') ?: '15').toInteger()
-        versionName = (project.findProperty('kidPlayerVersionName') ?: '0.7.4')
+        versionCode = (project.findProperty('kidPlayerVersionCode') ?: '16').toInteger()
+        versionName = (project.findProperty('kidPlayerVersionName') ?: '0.8.0')
         testInstrumentationRunner 'family.kidcinema.SafeTestRunner'
     }
     compileOptions {
