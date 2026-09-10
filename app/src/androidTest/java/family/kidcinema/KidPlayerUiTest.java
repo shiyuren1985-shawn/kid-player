@@ -12,7 +12,7 @@ public class KidPlayerUiTest {
     @Before public void before()throws Exception{
         Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();store=new AppStore(c);store.prefs.edit().clear().commit();store.online(true);store.mode("电视");device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());Configurator.getInstance().setWaitForIdleTimeout(500);
         JSONArray videos=new JSONArray();for(int i=1;i<=30;i++)videos.put(new JSONObject().put("bvid",String.format(java.util.Locale.ROOT,"BV%010d",i)).put("uid",BiliPolicy.UID).put("title","测试影片 "+i).put("author","测试作者").put("published",1700000000+i).put("duration","01:00"));
-        store.feed(new JSONObject().put("schema",1).put("uid",BiliPolicy.UID).put("syncedAt",System.currentTimeMillis()).put("source","public_collections").put("collectionCount",1).put("videos",videos));
+        store.feed(new JSONObject().put("schema",1).put("uid",BiliPolicy.UID).put("syncedAt",System.currentTimeMillis()).put("syncComplete",true).put("source","public_collections").put("collectionCount",1).put("videos",videos));
         store.prefs.edit().putLong("bili.attempt",System.currentTimeMillis()-120000).commit();
         c.startActivity(c.getPackageManager().getLaunchIntentForPackage(c.getPackageName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
         assertTrue(device.wait(Until.hasObject(By.text("kid player")),8000));
@@ -39,7 +39,19 @@ public class KidPlayerUiTest {
         click(By.text("管理 UP 主名单"));
         assertTrue(device.wait(Until.hasObject(By.text("UP 主名单来源")),3000));
         assertEquals(selected,store.selectedCreator());assertEquals(count,store.enabledCreators().size());
+        click(By.text("本机管理"));
+        assertTrue(device.wait(Until.hasObject(By.text("管理 UP 主")),3000));
+        assertTrue(device.hasObject(By.text("新增 UP 主 UID")));
+        assertFalse(device.hasObject(By.text("编辑本机 UP 主")));
         click(By.text("完成"));
+        click(By.text("管理 UP 主名单"));
+        assertTrue(device.wait(Until.hasObject(By.text("管理 UP 主")),3000));
+        assertTrue(device.hasObject(By.text("新增 UP 主 UID")));
+        click(By.text("名单来源"));
+        assertTrue(device.wait(Until.hasObject(By.text("UP 主名单来源")),3000));
+        click(By.text("云端名单（推荐）"));click(By.text("完成"));
+        assertTrue(store.remoteCreators());
+        assertEquals(selected,store.selectedCreator());assertEquals(count,store.enabledCreators().size());
         click(By.text("取消"));
         assertTrue(device.wait(Until.hasObject(By.text("测试影片 1")),3000));
     }

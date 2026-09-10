@@ -437,17 +437,20 @@ public class MainActivity extends Activity {
     }
     private void invalid(EditText field,String message){field.setError(message);field.requestFocus();field.requestRectangleOnScreen(new android.graphics.Rect(0,0,field.getWidth(),field.getHeight()),false);}
     private void manageCreators(){
+        if(store.remoteCreators())creatorSource();else localCreators(()->{});
+    }
+    private void creatorSource(){
         ScrollView scroll=new ScrollView(this);LinearLayout panel=column();panel.setPadding(dp(22),dp(14),dp(22),dp(18));scroll.addView(panel);
         RadioGroup source=new RadioGroup(this);RadioButton remote=new RadioButton(this);remote.setId(R.id.creators_cloud);remote.setText("云端名单（推荐）");remote.setMinHeight(dp(52));source.addView(remote);RadioButton local=new RadioButton(this);local.setId(R.id.creators_local);local.setText("本机管理");local.setMinHeight(dp(52));source.addView(local);source.check(store.remoteCreators()?R.id.creators_cloud:R.id.creators_local);panel.addView(source);panel.addView(text("名单改动立即生效。启用的 UP 主会显示在首页；关闭后隐藏，收藏和观看记录仍保留。",13,MUTED,false));
         LinearLayout cloud=column();panel.addView(cloud);cloud.addView(text("在你自己的 HTTPS JSON 文件中设置 UID，App 自动读取。此模式下不能在 App 内增删作者。",15,MUTED,false));space(cloud,12);
         EditText url=field(cloud,"云端名单地址",store.remoteUrl(),"HTTPS JSON 文件地址",false);url.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);
         TextView status=text(remoteSummary(),14,MUTED,false);cloud.addView(status);space(cloud,10);Button fetch=button("读取并使用云端名单",true,()->{});cloud.addView(fetch);
-        LinearLayout localPanel=column();localPanel.addView(text("本机名单与云端名单分别保存。切回云端时，以文件中的名单为准。",14,MUTED,false));space(localPanel,10);Button editLocal=button("编辑本机 UP 主",false,()->{});localPanel.addView(editLocal);panel.addView(localPanel);
-        TextView active=text("",14,INK,true);space(panel,12);panel.addView(active);Runnable update=()->{cloud.setVisibility(store.remoteCreators()?View.VISIBLE:View.GONE);localPanel.setVisibility(store.remoteCreators()?View.GONE:View.VISIBLE);active.setText("当前启用 "+store.enabledCreators().size()+" / "+store.creators().size()+" 位 UP 主");};update.run();editLocal.setOnClickListener(v->localCreators(update));
-        source.setOnCheckedChangeListener((g,id)->{capture();cancelLoad();store.remoteCreators(id==R.id.creators_cloud);items=new ArrayList<>();error="";update.run();refresh(false);});
+        LinearLayout localPanel=column();localPanel.addView(text("本机名单与云端名单分别保存。切回云端时，以文件中的名单为准。",14,MUTED,false));panel.addView(localPanel);
+        TextView active=text("",14,INK,true);space(panel,12);panel.addView(active);Runnable update=()->{cloud.setVisibility(store.remoteCreators()?View.VISIBLE:View.GONE);localPanel.setVisibility(store.remoteCreators()?View.GONE:View.VISIBLE);active.setText("当前启用 "+store.enabledCreators().size()+" / "+store.creators().size()+" 位 UP 主");};update.run();
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("UP 主名单来源").setView(scroll).setPositiveButton("完成",null).create();final Future<?>[] request={null};
+        source.setOnCheckedChangeListener((g,id)->{capture();cancelLoad();store.remoteCreators(id==R.id.creators_cloud);items=new ArrayList<>();error="";update.run();refresh(false);if(id==R.id.creators_local)dialog.dismiss();});
         fetch.setOnClickListener(v->{String value;try{value=RemoteConfig.checkedUrl(url.getText().toString());}catch(Exception e){invalid(url,"请填写有效的 HTTPS 文件地址");return;}fetch.setEnabled(false);status.setText("正在读取云端名单…");request[0]=settingsIo.submit(()->{boolean applied=RemoteConfig.refresh(store,value,true,RemoteConfig::fetch);runOnUiThread(()->{if(isDestroyed()||!dialog.isShowing())return;fetch.setEnabled(true);String failure=store.prefs.getString("remote.error","");status.setText(applied?remoteSummary():failure.isEmpty()?"刚刚检查过，请稍后再试。":failure);update.run();if(applied){cancelLoad();items=new ArrayList<>();refreshCreator(false);}});});});
-        dialog.setOnDismissListener(d->{if(request[0]!=null)request[0].cancel(true);if(!isDestroyed())render();});dialog.show();dialog.getWindow().setLayout(Math.min(dp(680),getResources().getDisplayMetrics().widthPixels-dp(32)),(int)(getResources().getDisplayMetrics().heightPixels*.85));
+        dialog.setOnDismissListener(d->{if(request[0]!=null)request[0].cancel(true);if(!isDestroyed()){render();if(!store.remoteCreators())localCreators(()->{});}});dialog.show();dialog.getWindow().setLayout(Math.min(dp(680),getResources().getDisplayMetrics().widthPixels-dp(32)),(int)(getResources().getDisplayMetrics().heightPixels*.85));
     }
     private String remoteSummary(){
         if(store.remoteUrl().isEmpty())return "尚未连接云端文件，当前使用初始名单。";
@@ -466,7 +469,7 @@ public class MainActivity extends Activity {
             card.addView(button("移除",false,()->{try{store.removeCreator(creator.uid);cancelLoad();items=new ArrayList<>();error="";draw[0].run();refresh(false);}catch(Exception e){toast("移除失败，请重试");}}));creators.addView(card);
         }};draw[0].run();space(panel,18);EditText uid=field(panel,"新增 UP 主 UID","","例如 402576555",false);uid.setInputType(InputType.TYPE_CLASS_NUMBER);
         TextView status=text("填写主页上的 UID，核对昵称和头像后添加。",14,MUTED,false);panel.addView(status);Button lookup=button("查找 UP 主",true,()->{});panel.addView(lookup);
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("管理 UP 主").setView(scroll).setPositiveButton("完成",null).create();final Future<?>[] task={null};
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("管理 UP 主").setView(scroll).setPositiveButton("完成",null).setNeutralButton("名单来源",(d,w)->creatorSource()).create();final Future<?>[] task={null};
         lookup.setOnClickListener(v->{long id;try{id=BiliPolicy.creatorUid(Long.parseLong(uid.getText().toString().trim()));}catch(Exception e){invalid(uid,"请输入有效的数字 UID");return;}if(store.creator(id)!=null){invalid(uid,"已经添加过这位 UP 主");return;}
             lookup.setEnabled(false);status.setText("正在核对 UP 主资料…");task[0]=settingsIo.submit(()->{AppStore.Creator found=null;String failure="";try{found=new BiliClient(id).profile();}catch(Exception e){failure=BiliClient.friendly(e);}AppStore.Creator creator=found;String message=failure;
                 runOnUiThread(()->{if(isDestroyed()||!dialog.isShowing())return;lookup.setEnabled(true);if(creator==null){status.setText(message);return;}
