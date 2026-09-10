@@ -15,7 +15,7 @@ final class BiliCatalog {
         return client.api(path);
     }
     static final int PAGE_BUDGET=5;
-    static final long FULL_INTERVAL=86400000L, RESUME_MAX_AGE=6*3600000L;
+    static final long FULL_INTERVAL=86400000L;
     private static JSONArray array(JSONObject value,String key){JSONArray a=value.optJSONArray(key);return a==null?new JSONArray():a;}
     private static boolean samePage(JSONArray a,JSONArray b)throws Exception{
         if(a.length()!=b.length())return false;
@@ -38,11 +38,12 @@ final class BiliCatalog {
         long now=System.currentTimeMillis(),fullAt=old.optLong("fullScanAt");
         boolean incremental=old.optBoolean("syncComplete")&&fullAt>0&&now-fullAt>=0&&now-fullAt<FULL_INTERVAL;
         LinkedHashMap<String,JSONObject> fresh=new LinkedHashMap<>();
-        BiliClient pages=new BiliClient(uid,this::read);
+        BiliClient pages=new BiliClient(uid,this::read);pages.cachedContributors(old);
         JSONObject first=pages.uploadPage(1),result=null;
         int total=first.getInt("total"),page=1,newPages=0;long started=now;
+        // Durable progress survives long cooldowns; head, total and boundary are revalidated below.
         JSONObject checkpoint=old.optJSONObject("scan");
-        if(!incremental&&checkpoint!=null&&checkpoint.optInt("total",-1)==total&&now-checkpoint.optLong("startedAt")>=0&&now-checkpoint.optLong("startedAt")<RESUME_MAX_AGE){
+        if(!incremental&&checkpoint!=null&&checkpoint.optInt("total",-1)==total&&now-checkpoint.optLong("startedAt")>=0){
             int next=checkpoint.optInt("nextPage",1);JSONArray saved=array(checkpoint,"videos");
             if(next>1&&saved.length()==(next-1)*30&&samePage(array(checkpoint,"firstPage"),first.getJSONArray("videos"))){
                 JSONObject boundary=next==2?first:pages.uploadPage(next-1);

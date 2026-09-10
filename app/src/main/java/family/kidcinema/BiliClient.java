@@ -39,6 +39,12 @@ public final class BiliClient {
     JSONObject api(String path)throws Exception{return transport.get(path);}
     private String uploadImageKey,uploadSubKey;
     private long uploadKeysAt;
+    private final Map<String,JSONObject> verifiedContributors=new HashMap<>();
+    void cachedContributors(JSONObject feed)throws Exception{
+        if(feed.optLong("uid")!=uid)return;
+        JSONArray rows=feed.optJSONArray("videos");if(rows==null)return;
+        for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);if(row.optLong("uid")==uid&&row.optLong("contributorCheckedAt")>0)verifiedContributors.put(row.getString("bvid"),row);}
+    }
     JSONObject uploadPage(int page)throws Exception{
         if(page<1)throw new IOException("投稿页码无效");
         if(uploadImageKey==null||System.currentTimeMillis()-uploadKeysAt>30000){
@@ -52,8 +58,20 @@ public final class BiliClient {
         JSONArray rows=response.getJSONObject("list").getJSONArray("vlist"),videos=new JSONArray();
         if(rows.length()!=Math.min(30,Math.max(0L,total-(long)(page-1)*30)))throw new IOException("投稿分页不完整，保留已有目录。");
         for(int i=0;i<rows.length();i++){
-            JSONObject row=rows.getJSONObject(i);BiliPolicy.owner(row.getLong("mid"),uid);long published=row.getLong("created");if(published<=0)throw new IOException("投稿时间无效");
-            videos.put(new JSONObject().put("bvid",BiliPolicy.bvid(row.getString("bvid"))).put("uid",uid).put("title",row.getString("title"))
+            JSONObject row=rows.getJSONObject(i);long publisher=row.getLong("mid"),checkedAt=0;
+            if(publisher!=uid){
+                if(row.optInt("is_union_video")!=1)BiliPolicy.owner(publisher,uid);
+                String id=BiliPolicy.bvid(row.getString("bvid"));JSONObject cached=verifiedContributors.get(id);long now=System.currentTimeMillis();
+                if(cached!=null&&cached.optLong("publisherUid")==publisher&&now>=cached.optLong("contributorCheckedAt")&&now-cached.optLong("contributorCheckedAt")<BiliCatalog.FULL_INTERVAL)checkedAt=cached.getLong("contributorCheckedAt");
+                else {
+                    JSONObject detail=data(transport.get("/x/web-interface/view?bvid="+id));
+                    verifyContributor(detail,id,uid);
+                    if(detail.getJSONObject("owner").getLong("mid")!=publisher)throw new IOException("联合投稿发布者信息不一致，已保留进度。");
+                    checkedAt=now;
+                }
+            }
+            long published=row.getLong("created");if(published<=0)throw new IOException("投稿时间无效");
+            videos.put(new JSONObject().put("bvid",BiliPolicy.bvid(row.getString("bvid"))).put("uid",uid).put("publisherUid",publisher).put("contributorCheckedAt",checkedAt).put("title",row.getString("title"))
                 .put("author",row.getString("author")).put("published",published).put("duration",row.optString("length")).put("pic",row.optString("pic")));
         }
         return new JSONObject().put("total",total).put("page",page).put("videos",videos);
@@ -86,11 +104,21 @@ public final class BiliClient {
             this.video=videoUrls.get(0);this.audio=audioUrls.isEmpty()?null:audioUrls.get(0);this.cid=cid;
         }
     }
+    // A creator can be the publisher or a credited collaborator of a public union upload.
+    static void verifyContributor(JSONObject view,String id,long expected)throws Exception{
+        BiliPolicy.creatorUid(expected);
+        if(!BiliPolicy.bvid(id).equals(view.getString("bvid")))throw new IOException("视频身份不匹配");
+        long publisher=BiliPolicy.creatorUid(view.getJSONObject("owner").getLong("mid"));
+        if(publisher==expected)return;
+        JSONArray staff=view.optJSONArray("staff");
+        if(staff!=null)for(int i=0;i<staff.length();i++)if(staff.getJSONObject(i).optLong("mid")==expected)return;
+        throw new IllegalArgumentException("该视频的发布者和联合投稿名单均不包含当前 UP 主，已保留读取进度。");
+    }
     public Playback resolve(String id) throws Exception {
         BiliPolicy.bvid(id);
         JSONObject view=data(transport.get("/x/web-interface/view?bvid="+id));
         if(!id.equals(view.getString("bvid")))throw new IOException("视频身份不匹配");
-        BiliPolicy.owner(view.getJSONObject("owner").getLong("mid"),uid);
+        verifyContributor(view,id,uid);
         if(view.getInt("state")!=0 || view.optBoolean("is_upower_exclusive") || view.optInt("is_upower_exclusive")!=0 || view.getJSONObject("rights").optInt("pay")!=0 || view.getJSONObject("rights").optInt("ugc_pay")!=0)
             throw new IOException("本原型只尝试可公开播放的视频，不处理付费或受限内容。");
         JSONArray pages=view.getJSONArray("pages");

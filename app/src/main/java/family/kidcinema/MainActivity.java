@@ -48,7 +48,7 @@ public class MainActivity extends Activity {
     private final ExecutorService settingsIo=Executors.newFixedThreadPool(2);
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final Map<String,Position> positions=new HashMap<>();
-    private final Runnable autoSync=new Runnable(){public void run(){if(store.online()&&!loading)refreshOnline(false);handler.postDelayed(this,BiliPolicy.INTERVAL_MS);}};
+    private final Runnable autoSync=new Runnable(){public void run(){if(store.online()&&!loading)refreshOnline(false);handler.postDelayed(this,15000);}};
     private static final class Position {
         String anchor="header",focus="";int index,offset;
     }
@@ -59,7 +59,7 @@ public class MainActivity extends Activity {
             Position p=new Position();p.anchor=state.getString("anchor","header");p.focus=state.getString("focus","");p.index=state.getInt("index");p.offset=state.getInt("offset");positions.put(page(),p);}
         refresh(false);
     }
-    @Override protected void onResume(){super.onResume();handler.postDelayed(()->{if(foreground)AppUpdater.home(this);},1200);foreground=true;if(brandIcon!=null)brandIcon.setImageResource(LauncherIcons.selected(store).image);if(list!=null){render();if(store.online()&&!loading)refreshOnline(false);}handler.removeCallbacks(autoSync);handler.postDelayed(autoSync,BiliPolicy.INTERVAL_MS);}
+    @Override protected void onResume(){super.onResume();handler.postDelayed(()->{if(foreground)AppUpdater.home(this);},1200);foreground=true;if(brandIcon!=null)brandIcon.setImageResource(LauncherIcons.selected(store).image);if(list!=null){render();if(store.online()&&!loading)refreshOnline(false);}handler.removeCallbacks(autoSync);handler.postDelayed(autoSync,15000);}
     @Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);if(hasFocus&&list!=null&&tv){Position p=positions.get(shownPage);if(p!=null&&!p.focus.isEmpty())restoreFocus(renderGeneration,p.focus,0);}}
     @Override protected void onPause(){foreground=false;if(!playbackReturnFocus.isEmpty())leftForPlayback=true;capture();handler.removeCallbacks(autoSync);super.onPause();}
     @Override protected void onSaveInstanceState(Bundle state){capture();super.onSaveInstanceState(state);state.putString("searchQuery",searchQuery);state.putBoolean("searchAll",searchAll);state.putString("folder",folder);state.putString("section",section);Position p=positions.get(page());if(p!=null){state.putString("anchor",p.anchor);state.putString("focus",p.focus);state.putInt("index",p.index);state.putInt("offset",p.offset);}}
@@ -172,7 +172,7 @@ public class MainActivity extends Activity {
         if(store.selectedCreator()==0)return store.remoteCreators()?"请在云端文件配置作者，再读取名单。":"请在播放设置添加并启用 UP 主。";
         try{org.json.JSONObject feed=store.feed();
             if(feed.has("total"))return (feed.optBoolean("syncComplete")?"全部投稿 "+feed.getInt("total")+" 条":"投稿已读取 "+feed.optInt("loadedCount")+" / 共 "+feed.getInt("total")+" 条（尚未读完）")
-                +("paused".equals(feed.optString("phase"))?" · 已保存进度，稍后继续":"")
+                +(!feed.optBoolean("syncComplete")&&!catalogBusy()?" · 已保存进度，约 "+Math.max(1,(BiliSync.waitMillis(store,store.selectedCreator(),false)+999)/1000)+" 秒后自动续读（联网时）":"")
                 +(feed.optLong("syncedAt")>0?" · 上次同步 "+new java.text.SimpleDateFormat("MM-dd HH:mm",Locale.CHINA).format(new Date(feed.getLong("syncedAt"))):"");
             return "缓存目录 "+feed.getJSONArray("videos").length()+" 条 · 待核对全部投稿";
         }catch(Exception e){return "目录暂不可用";}
@@ -303,7 +303,7 @@ public class MainActivity extends Activity {
         }
         if(!store.online()&&!folder.isEmpty() && section.equals("全部影片"))titleRow.addView(button("‹ 上一层",false,this::up));
         if(catalogBusy()){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setTag("sync:progress");spinner.setContentDescription("正在更新目录");spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(GREEN));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(24),dp(24));sp.setMargins(0,0,dp(10),0);titleRow.addView(spinner,sp);}
-        Button refresh=button(catalogBusy()?"更新中":searchActive()?"刷新当前 UP":"刷新",false,this::refresh);refresh.setTag("refresh");refresh.setEnabled(!catalogBusy());titleRow.addView(refresh);box.addView(titleRow);space(box,6);
+        Button refresh=button(catalogBusy()?"更新中":searchActive()?"刷新当前 UP":store.online()&&BiliSync.incomplete(store,store.selectedCreator())?"继续读取":"刷新",false,this::refresh);refresh.setTag("refresh");refresh.setEnabled(!catalogBusy());titleRow.addView(refresh);box.addView(titleRow);space(box,6);
         if(searchActive()){
             String scope=searchAll?"全部订阅":store.creator(store.selectedCreator())==null?"当前 UP 主":store.creator(store.selectedCreator()).name;
             box.addView(text(searching?"正在搜索本机目录…":scope+" · 标题包含“"+searchQuery.trim()+"”",14,MUTED,false));

@@ -154,6 +154,7 @@ public final class AppStore {
     }
     // Retain the v0.3 keys for the original creator; its catalog/history migrates without data loss.
     String biliKey(long uid,String field) { return uid==BiliPolicy.UID ? "bili."+field : "bili."+uid+"."+field; }
+    Context appContext(){return context;}
     public JSONObject feed() throws Exception {return feed(selectedCreator());}
     public JSONObject feed(long uid) throws Exception {
         BiliPolicy.creatorUid(uid);

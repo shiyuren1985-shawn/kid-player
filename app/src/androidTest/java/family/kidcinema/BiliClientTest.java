@@ -73,7 +73,7 @@ public class BiliClientTest {
         BiliClient paid=new BiliClient(path->{JSONObject view=detail(BiliPolicy.UID);view.getJSONObject("data").getJSONObject("rights").put("pay",1);return view;});
         assertThrows(java.io.IOException.class,()->paid.resolve(ID));
     }
-    @Test public void onlineUiShowsStaleWarningWithoutSearchOrWebView() throws Exception {
+    @Test public void onlineUiShowsStaleWarningWithLocalSearchAndNoWebView() throws Exception {
         Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();AppStore store=new AppStore(context);
         store.prefs.edit().clear().commit();store.feed(sync(client(BiliPolicy.UID)));store.online(true);
         store.prefs.edit().putLong("bili.attempt",System.currentTimeMillis()).putString("bili.error","测试限制 -352（模拟响应）").commit();
@@ -82,7 +82,7 @@ public class BiliClientTest {
         assertTrue(device.wait(Until.hasObject(By.textContains("本次更新未完成，保留上次目录")),10000));
         assertTrue(device.hasObject(By.textContains("测试限制 -352")));
         assertFalse(device.hasObject(By.clazz("android.webkit.WebView")));assertFalse(device.hasObject(By.text("搜索")));
-        assertFalse(device.hasObject(By.clazz("android.widget.EditText")));
+        assertTrue(device.hasObject(By.desc("搜索视频关键词")));
         device.pressDPadDown();assertTrue(device.hasObject(By.focused(true)));
         device.pressHome();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{});
         androidx.work.WorkManager.getInstance(context).cancelUniqueWork("approved-bili-sync").getResult().get();

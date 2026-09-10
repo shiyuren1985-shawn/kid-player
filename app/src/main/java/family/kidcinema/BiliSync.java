@@ -16,11 +16,19 @@ final class BiliSync {
     static String riskMessage(AppStore store){
         return "B 站暂时限制访问，已保留缓存。下次可尝试："+new java.text.SimpleDateFormat("MM-dd HH:mm",java.util.Locale.CHINA).format(new java.util.Date(riskUntil(store)))+"（应用冷却时间）。";
     }
-    static boolean due(AppStore store,long uid,boolean manual) {
-        if(riskCooling(store))return false;
-        long elapsed=System.currentTimeMillis()-store.syncAttempt(uid);
-        return elapsed<0 || elapsed>=(manual?60000:BiliPolicy.INTERVAL_MS);
+    static boolean incomplete(AppStore store,long uid){
+        try{return !store.feed(uid).optBoolean("syncComplete");}catch(Exception e){return false;}
     }
+    static long waitMillis(AppStore store,long uid,boolean manual){
+        long now=System.currentTimeMillis(),attempt=store.syncAttempt(uid);
+        long interval=manual||(incomplete(store,uid)&&store.syncError(uid).isEmpty())?60000:BiliPolicy.INTERVAL_MS;
+        long remaining=now<attempt?0:Math.max(0,interval-(now-attempt));
+        return Math.max(remaining,Math.max(0,riskUntil(store)-now));
+    }
+    static boolean due(AppStore store,long uid,boolean manual) {
+        return waitMillis(store,uid,manual)==0;
+    }
+
     static String cooldownMessage(AppStore store,long uid){
         if(riskCooling(store))return riskMessage(store);
         long seconds=Math.max(1,(60000-(System.currentTimeMillis()-store.syncAttempt(uid))+999)/1000);
@@ -52,6 +60,12 @@ final class BiliSync {
             if(e instanceof BiliAccessException)recordRisk(store);
             store.prefs.edit().putString(store.biliKey(uid,"error"),BiliClient.friendly(e)).commit();
             return Outcome.FAILED;
-        }finally{activeUid=0;}
+        }finally{
+            // Rest between completed batches, including slow requests and errors.
+            store.prefs.edit().putLong(store.biliKey(uid,"attempt"),System.currentTimeMillis()).commit();
+            activeUid=0;
+            if(!Thread.currentThread().isInterrupted()&&store.allowedCreator(uid)&&incomplete(store,uid))
+                BiliSyncWorker.continueLater(store.appContext(),store,uid);
+        }
     }
 }
