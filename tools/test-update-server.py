@@ -41,7 +41,8 @@ class PublishTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=ROOT/'qa') as directory:
             root=pathlib.Path(directory)/'public';args=(apk,root,'https://example.com','test',os.environ['ANDROID_HOME'])
             first=publisher.publish(*args);second=publisher.publish(*args)
-            self.assertEqual(first['sha256'],second['sha256'])
+            self.assertEqual(first,second)
+            with self.assertRaises(ValueError):publisher.publish(apk,root,'https://example.com','changed notes',os.environ['ANDROID_HOME'])
             newer=dict(second);newer['versionCode']+=1
             (root/'kid-player/update.json').write_text(json.dumps(newer))
             before=(root/'kid-player/update.json').read_bytes()
@@ -50,6 +51,30 @@ class PublishTest(unittest.TestCase):
             current=json.loads(before);self.assertTrue((root/'kid-player/releases'/current['apkUrl'].rsplit('/',1)[-1]).is_file())
     def test_rejects_non_https_origin(self):
         with self.assertRaises(ValueError):publisher.publish(pathlib.Path('absent'),pathlib.Path('absent'),'http://example.com','notes',os.environ['ANDROID_HOME'])
+
+class WebsitePipelineTest(unittest.TestCase):
+    def setUp(self):
+        import unittest.mock
+        import update_service_files
+        self.temp=tempfile.TemporaryDirectory(dir=ROOT/'qa');self.folder=pathlib.Path(self.temp.name)
+        self.root=self.folder/'public';self.apk=ROOT/'app/build/outputs/apk/debug/app-debug.apk'
+        self.script=self.folder/'website.py'
+        self.patch=unittest.mock.patch.object(update_service_files,'SERVICE_HOME',self.folder/'absent-service')
+        self.patch.start()
+    def tearDown(self):self.patch.stop();self.temp.cleanup()
+    def publish(self):
+        return publisher.publish_release(self.apk,self.root,'https://example.com','pipeline test',os.environ['ANDROID_HOME'],self.script)
+    def test_missing_website_command_fails_before_local_publication(self):
+        with self.assertRaises(FileNotFoundError):self.publish()
+        self.assertFalse((self.root/'kid-player/update.json').exists())
+    def test_website_failure_and_idempotent_retry(self):
+        self.script.write_text('import sys; sys.exit(7)\n')
+        with self.assertRaisesRegex(RuntimeError,'saved locally'):self.publish()
+        manifest=self.root/'kid-player/update.json';before=manifest.read_bytes()
+        self.script.write_text("import json,pathlib,sys\nassert sys.argv[1]=='--source' and sys.argv[3]=='--deploy'\nsource=pathlib.Path(sys.argv[2])\nmanifest=json.loads((source/'update.json').read_text())\nassert (source/'releases'/manifest['apkUrl'].rsplit('/',1)[-1]).is_file()\n(source.parent.parent/'website-called.json').write_text(json.dumps(manifest))\n")
+        result=self.publish()
+        self.assertEqual(before,manifest.read_bytes())
+        self.assertEqual(result,json.loads((self.folder/'website-called.json').read_text()))
 
 class ServiceMirrorTest(unittest.TestCase):
     def setUp(self):

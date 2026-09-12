@@ -24,9 +24,32 @@
 bash tools/publish-update.sh --notes '本次更新说明'
 ```
 
-脚本先构建并执行单元测试、lint，然后验证 APK 签名和身份，复制版本化 APK 至独立公开目录，最后原子替换 `update.json`。拒绝降版本、同 versionCode 替换不同字节及改变签名，避免平板拿到半个文件或错包。已有 APK 永不覆盖。发布前后的清单和 SHA 应留在相应本机 QA 记录。UI 改动的仪器/视觉验证须另外完成，发布脚本不会替代这些检查。
+脚本先构建并执行单元测试、lint，然后验证 APK 签名和身份，复制版本化 APK 至独立公开目录，最后原子替换 `update.json`。拒绝降版本、同 versionCode 替换不同字节及改变签名，避免平板拿到半个文件或错包。已有 APK 永不覆盖。同版本重试保留原发布说明、地址和发布时间；元数据不一致时拒绝冒充重试。发布前后的清单和 SHA 应留在相应本机 QA 记录。UI 改动的仪器/视觉验证须另外完成，发布脚本不会替代这些检查。
 
 默认目录：`/Volumes/ZHITAI/AI/KidPlayer/update-server/public/kid-player/`。当前下载路径为 `/kid-player/releases/kid-player-0.8.2-18.apk`。`tools/package.sh` 仅导出本地 APK，不发布清单。
+
+## 官网最新版下载（2026-09-12）
+
+官网使用固定入口 `https://shiyu.ren/downloads/kid-player/latest.apk`；页面读取同源 `/downloads/kid-player/latest.json` 显示版本、大小、日期和更新说明。最新版入口/清单不缓存，具体版本的 APK 保持不可变并可长期缓存。不要在网页上手工写入每次新版本的文件名。
+
+正常发布命令仍为 `bash tools/publish-update.sh --notes '本次更新说明'`。`publish-update.py` 在完成本机发布和已安装更新服务镜像后，自动调用：
+
+```bash
+python3 /Volumes/ZHITAI/AI/yuren.shi/scripts/sync-kid-release.py \
+  --source /Volumes/ZHITAI/AI/KidPlayer/update-server/public/kid-player --deploy
+```
+
+网站同步脚本由网站仓库维护，负责身份/签名/SHA 核验、上传、远端原子切换和回读。下载目录独立于网页部署目录；网站更新或回滚不能把最新版 APK 指针带回旧版。新增网站功能介绍或更换截图才需要编辑网页；单纯发布新 APK 无需再通知网站任务。
+
+发布全流程有独立互斥锁。网站脚本缺失时在本机发布前退出；网站同步失败时整条发布命令返回非零，明确本机版本已保存、官网未确认。本机和 VPS 不能组成一次跨机器原子事务，不自动回退本机已发布版本。修复连接后用原 APK、原说明和原地址重试，重复发布不会刷新发布时间或伪造新版本。
+
+可用 `--website-sync-script` 指定另一台开发机上的网站脚本位置。`--skip-website` 仅用于明确的本机诊断，会输出未完成官网发布的提示，不能据此宣称完整发布成功。私人 SSH 凭据由网站部署环境持有，不写入 APK 或公开清单。
+
+原应用内更新地址独立保留；本次连接官网发布链路不修改已安装 APK 的更新源。
+
+2026-09-12 验收：本侧 10 项发布/镜像/失败重试测试通过；正式发布命令重放原 0.8.2 / code18 成功，原清单字节和发布时间未变。官网固定入口返回 302 和 no-store，两个静态 HTML 下载按钮均为固定入口，公网完整 APK SHA256 与原发布一致（`26c260b1ee8235c34aa1cc84edb9e22010b903adfce9671ed9b49e2e5183da90`）。证据：`qa/website-release-pipeline/`。本次未改 APK。
+
+参考：[GitHub 的最新版发布/下载固定入口](https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases)、[MDN HTTP 缓存](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching)、[MDN 临时重定向](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/302)。
 
 ## 服务与来源迁移
 
