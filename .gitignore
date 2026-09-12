@@ -10,3 +10,14 @@ tools/downloads/
 qa/
 
 __pycache__/
+
+# Never publish local credentials or signing material
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key

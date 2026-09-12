@@ -5,7 +5,7 @@
 - 图片生成、打开、视觉检查必须委派隔离子 Agent，仅返回文字结论与文件路径；主线程不加载或展示图片，除非用户明确要求当前主对话展示指定图片。
 - 读取其他 Codex 任务仅取文字摘要，includeOutputs=false，不读取原始历史图片载荷。
 - 构建不等于实际播放验收。仪器测试只能在专用 AVD 运行，使用恢复偏好/网络的包装脚本，不测试家用正式设备。
-- GitHub 仓库必须私人；不要提交密钥、真实设备偏好或签名私钥。App 更新目标是个人域名和 Cloudflare，GitHub 仅用于私人源码和交接归档。
+- 用户于 2026-09-12 授权 GitHub 仓库公开，用于开源源码及版本发布。不要提交密钥、真实设备偏好或签名私钥。遵守 LICENSE 和 THIRD_PARTY_NOTICES.md 的许可边界；网站固定下载入口随发布自动更新。
 
 - 显示名称为精确小写 `kid player`，仓库与新产物 slug 为 `kid-player`。保持 `applicationId=family.kidcinema`、存储键及签名兼容性；历史 ZIP/APK/QA 原名原 SHA 保留。
 - Mini 源码位于 `/Volumes/ZHITAI/AI/KidPlayer/kid-player`，新增环境和缓存默认位于相邻外置盘 `runtime`；先 source tools/env.sh，不提交本机凭据和签名文件。

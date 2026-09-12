@@ -1,6 +1,11 @@
 # kid player · Android 原型
 
-当前私人仓库：`https://github.com/shiyuren1985-shawn/kid-player`。Mini 源码目录：`/Volumes/ZHITAI/AI/KidPlayer/kid-player`；新增环境和缓存位于相邻外置盘 `runtime/`，Python 虚拟环境位于 `tools/.venv`。开发只在 Mini 单端进行。
+kid player 是免费开源的 Android 播放器，项目源码采用 [MIT 许可证](LICENSE)。第三方角色素材、依赖及视频内容的权利范围见 [第三方声明](THIRD_PARTY_NOTICES.md)。
+
+- [下载最新安装版](https://shiyu.ren/downloads/kid-player/latest.apk)
+- [GitHub Releases](https://github.com/shiyuren1985-shawn/kid-player/releases)
+
+GitHub 源码仓库：`https://github.com/shiyuren1985-shawn/kid-player`。Mini 源码目录：`/Volumes/ZHITAI/AI/KidPlayer/kid-player`；新增环境和缓存位于相邻外置盘 `runtime/`，Python 虚拟环境位于 `tools/.venv`。开发只在 Mini 单端进行。
 
 用于观看家长指定范围的视频。一个 APK 包含触控平板布局与电视遥控器布局，保留本地演示与 SMB，并新增实验性 B 站指定 UP 主订阅。
 
@@ -251,4 +256,4 @@ python3 tools/test-emulator.py --live
 
 `applicationId=family.kidcinema`、存储键保持不变。Mini 的新调试签名不能覆盖 Air 的旧调试签名包，不得卸载清数据冒充升级成功。`bash tools/package.sh` 将调试构建导出至 `output/releases/kid-player-<version>-debug.apk`；Gradle 内部中间输出仍使用标准 `app-debug.apk`。
 
-更新源现已使用 `kid-player.shiyu.ren/kid-player/update.json` 与版本化 APK；作者名单仍独立配置。当前 GitHub 用于私人源码和交接归档，未来可切换到匿名可访问的 HTTPS 分发源，详见应用更新说明。
+更新源现已使用 `kid-player.shiyu.ren/kid-player/update.json` 与版本化 APK；作者名单仍独立配置。GitHub 用于公开源码与版本发布，网站使用固定下载入口自动指向最新安装包，详见应用更新说明。
