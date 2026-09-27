@@ -24,13 +24,12 @@ public class MainActivity extends Activity {
     private LinearLayout searchPanel;
     private ImageView brandIcon;
     private EditText searchInput;
-    private String searchQuery="", searchFingerprint="";
-    private boolean searchAll=false, searching=false;
+    private String searchQuery="", searchDraft="", searchFingerprint="";
+    private boolean searchAll=false, searchDraftAll=false, searching=false;
     private int searchRevision=0;
     private CatalogSearch.Result searchResult;
     private Future<?> searchTask;
     private final ExecutorService searchIo=Executors.newSingleThreadExecutor();
-    private final Runnable searchChanged=()->{render();};
     private GridLayoutManager layout;
     private Cards adapter;
     private List<LibraryItem> items=new ArrayList<>(),visible=new ArrayList<>();
@@ -55,14 +54,14 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);store=new AppStore(this);try{LauncherIcons.reconcile(this,store);}catch(RuntimeException ignored){}knownCreators=creatorSignature();store.prefs.registerOnSharedPreferenceChangeListener(creatorChanges);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        if(state!=null){searchQuery=state.getString("searchQuery","");searchAll=state.getBoolean("searchAll",false);folder=state.getString("folder","");section=state.getString("section","全部影片");if(section.equals("我的喜欢"))section="我的收藏";if(section.equals("继续观看"))section="观看历史";
+        if(state!=null){searchQuery=state.getString("searchQuery","");searchAll=state.getBoolean("searchAll",false);searchDraft=state.getString("searchDraft",searchQuery);searchDraftAll=state.getBoolean("searchDraftAll",searchAll);folder=state.getString("folder","");section=state.getString("section","全部影片");if(section.equals("我的喜欢"))section="我的收藏";if(section.equals("继续观看"))section="观看历史";
             Position p=new Position();p.anchor=state.getString("anchor","header");p.focus=state.getString("focus","");p.index=state.getInt("index");p.offset=state.getInt("offset");positions.put(page(),p);}
         refresh(false);
     }
     @Override protected void onResume(){super.onResume();handler.postDelayed(()->{if(foreground)AppUpdater.home(this);},1200);foreground=true;if(brandIcon!=null)brandIcon.setImageResource(LauncherIcons.selected(store).image);if(list!=null){render();if(store.online()&&!loading)refreshOnline(false);}handler.removeCallbacks(autoSync);handler.postDelayed(autoSync,15000);}
     @Override public void onWindowFocusChanged(boolean hasFocus){super.onWindowFocusChanged(hasFocus);if(hasFocus&&list!=null&&tv){Position p=positions.get(shownPage);if(p!=null&&!p.focus.isEmpty())restoreFocus(renderGeneration,p.focus,0);}}
     @Override protected void onPause(){foreground=false;if(!playbackReturnFocus.isEmpty())leftForPlayback=true;capture();handler.removeCallbacks(autoSync);super.onPause();}
-    @Override protected void onSaveInstanceState(Bundle state){capture();super.onSaveInstanceState(state);state.putString("searchQuery",searchQuery);state.putBoolean("searchAll",searchAll);state.putString("folder",folder);state.putString("section",section);Position p=positions.get(page());if(p!=null){state.putString("anchor",p.anchor);state.putString("focus",p.focus);state.putInt("index",p.index);state.putInt("offset",p.offset);}}
+    @Override protected void onSaveInstanceState(Bundle state){capture();super.onSaveInstanceState(state);state.putString("searchQuery",searchQuery);state.putBoolean("searchAll",searchAll);state.putString("searchDraft",searchDraft);state.putBoolean("searchDraftAll",searchDraftAll);state.putString("folder",folder);state.putString("section",section);Position p=positions.get(page());if(p!=null){state.putString("anchor",p.anchor);state.putString("focus",p.focus);state.putInt("index",p.index);state.putInt("offset",p.offset);}}
     @Override public void onConfigurationChanged(Configuration config){capture();super.onConfigurationChanged(config);layoutSignature="";render();}
     @Override protected void onDestroy(){store.prefs.unregisterOnSharedPreferenceChangeListener(creatorChanges);cancelLoad();io.shutdownNow();settingsIo.shutdownNow();searchIo.shutdownNow();handler.removeCallbacksAndMessages(null);super.onDestroy();}
     private int dp(float value){return Math.round(value*getResources().getDisplayMetrics().density);}
@@ -237,8 +236,11 @@ public class MainActivity extends Activity {
         shell=column();shell.setBackgroundColor(BG);shell.setPadding(dp(20),dp(12),dp(20),dp(12));
         shell.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(dp(20)+insets.getSystemWindowInsetLeft(),dp(12)+insets.getSystemWindowInsetTop(),dp(20)+insets.getSystemWindowInsetRight(),dp(12)+insets.getSystemWindowInsetBottom());return insets;});
         LinearLayout header=row();ImageView icon=new ImageView(this);brandIcon=icon;icon.setImageResource(LauncherIcons.selected(store).image);icon.setContentDescription("kid player");header.addView(icon,new LinearLayout.LayoutParams(dp(48),dp(48)));
-        LinearLayout brand=column();brand.setPadding(dp(12),0,dp(8),0);brand.addView(text("kid player",25,INK,true));if(width>600)brand.addView(text("把喜欢的故事，留给你",13,MUTED,false));header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
-        Button settings=button("播放设置",false,this::settings);settings.setTag("settings");settings.setContentDescription("播放设置");header.addView(settings);shell.addView(header);space(shell,10);buildSearchPanel();shell.addView(searchPanel);space(shell,6);
+        LinearLayout brand=column();brand.setPadding(dp(12),0,dp(8),0);brand.addView(text("kid player",25,INK,true));if(width>600&&!store.online())brand.addView(text("把喜欢的故事，留给你",13,MUTED,false));header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
+        buildSearchPanel();boolean inlineSearch=width>=700;
+        if(inlineSearch){LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(0,-2,3);sp.setMargins(dp(8),0,dp(12),0);header.addView(searchPanel,sp);}
+        Button settings=button("播放设置",false,this::settings);settings.setTag("settings");settings.setContentDescription("播放设置");header.addView(settings);shell.addView(header);space(shell,10);
+        if(!inlineSearch){shell.addView(searchPanel);space(shell,6);}
         LinearLayout body=wide?row():column();body.setGravity(Gravity.TOP);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         nav=wide?column():row();int navWidth=Math.round(190+Math.max(0,scale-1)*80);
         if(wide){ScrollView navScroll=new ScrollView(this);navScroll.addView(nav);body.addView(navScroll,new LinearLayout.LayoutParams(dp(navWidth),-1));}
@@ -249,23 +251,31 @@ public class MainActivity extends Activity {
         adapter=new Cards();list.setAdapter(adapter);body.addView(list,wide?new LinearLayout.LayoutParams(0,-1,1):new LinearLayout.LayoutParams(-1,0,1));
         shell.setFocusableInTouchMode(true);setContentView(shell);shell.requestFocus();shell.requestApplyInsets();
     }
-    private void clearSearch(){
-        searchInput.setText("");handler.removeCallbacks(searchChanged);
+    private void dismissSearchKeyboard(){
         ((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(searchInput.getWindowToken(),0);
-        searchInput.clearFocus();shell.requestFocus();render();
+        searchInput.clearFocus();shell.requestFocus();
+    }
+    private void submitSearch(){
+        capture();searchQuery=searchDraft.trim();searchAll=searchDraftAll;searchFingerprint="";
+        dismissSearchKeyboard();render();
+    }
+    private void clearSearch(){
+        capture();searchDraft="";searchQuery="";searchFingerprint="";searchInput.setText("");
+        dismissSearchKeyboard();render();
     }
     private void buildSearchPanel(){
-        searchPanel=column();searchPanel.setPadding(0,0,0,dp(6));
-        LinearLayout entry=row();searchInput=new EditText(this);searchInput.setSingleLine(true);searchInput.setTextSize(17);searchInput.setHint("搜索视频标题");searchInput.setContentDescription("搜索视频关键词");searchInput.setTag("search:input");searchInput.setText(searchQuery);searchInput.setSelectAllOnFocus(false);
-        searchInput.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);searchInput.setPadding(dp(14),dp(8),dp(14),dp(8));searchInput.setBackground(bg(Color.WHITE,12));
-        entry.addView(searchInput,new LinearLayout.LayoutParams(0,dp(52),1));
-        Button clear=button("清除",false,this::clearSearch);clear.setContentDescription("清除搜索关键词");LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-2,dp(52));cp.setMargins(dp(8),0,0,0);entry.addView(clear,cp);searchPanel.addView(entry);
-        RadioGroup scopes=new RadioGroup(this);scopes.setOrientation(LinearLayout.HORIZONTAL);int current=View.generateViewId(),all=View.generateViewId();
-        RadioButton here=new RadioButton(this);here.setId(current);here.setText("当前 UP 主");here.setTextSize(15);here.setMinHeight(dp(44));scopes.addView(here);
-        RadioButton every=new RadioButton(this);every.setId(all);every.setText("全部订阅");every.setTextSize(15);every.setMinHeight(dp(44));scopes.addView(every);scopes.check(searchAll?all:current);searchPanel.addView(scopes);
-        scopes.setOnCheckedChangeListener((group,id)->{capture();searchAll=id==all;searchFingerprint="";render();});
-        searchInput.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence value,int start,int count,int after){}public void onTextChanged(CharSequence value,int start,int before,int count){capture();searchQuery=value.toString();handler.removeCallbacks(searchChanged);handler.postDelayed(searchChanged,180);}public void afterTextChanged(android.text.Editable value){}});
-        searchInput.setOnEditorActionListener((view,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH){handler.removeCallbacks(searchChanged);render();((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(searchInput.getWindowToken(),0);return true;}return false;});
+        searchPanel=row();
+        searchInput=new EditText(this);searchInput.setSingleLine(true);searchInput.setTextSize(16);searchInput.setHint("搜索视频标题");searchInput.setContentDescription("搜索视频关键词");searchInput.setTag("search:input");searchInput.setText(searchDraft);searchInput.setSelectAllOnFocus(false);
+        searchInput.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);searchInput.setPadding(dp(10),dp(8),dp(10),dp(8));searchInput.setBackground(bg(Color.WHITE,12));
+        searchPanel.addView(searchInput,new LinearLayout.LayoutParams(0,dp(52),1));
+        Spinner scopes=new Spinner(this);scopes.setContentDescription("搜索范围");
+        ArrayAdapter<String> options=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,new String[]{"当前 UP","全部订阅"});options.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);scopes.setAdapter(options);scopes.setSelection(searchDraftAll?1:0);
+        searchPanel.addView(scopes,new LinearLayout.LayoutParams(dp(132),dp(52)));
+        scopes.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?> parent,View view,int position,long id){searchDraftAll=position==1;}public void onNothingSelected(AdapterView<?> parent){}});
+        Button submit=button("搜索",true,this::submitSearch);submit.setContentDescription("搜索视频");submit.setPadding(dp(8),dp(10),dp(8),dp(10));submit.setMinWidth(0);submit.setMinimumWidth(0);searchPanel.addView(submit,new LinearLayout.LayoutParams(dp(64),dp(52)));
+        Button clear=button("清除",false,this::clearSearch);clear.setContentDescription("清除搜索关键词");clear.setPadding(dp(8),dp(10),dp(8),dp(10));clear.setMinWidth(0);clear.setMinimumWidth(0);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(dp(64),dp(52));cp.setMargins(dp(6),0,0,0);searchPanel.addView(clear,cp);
+        searchInput.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence value,int start,int count,int after){}public void onTextChanged(CharSequence value,int start,int before,int count){searchDraft=value.toString();}public void afterTextChanged(android.text.Editable value){}});
+        searchInput.setOnEditorActionListener((view,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_DONE||action==android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH){dismissSearchKeyboard();return true;}return false;});
     }
     private void buildNav(){
         nav.removeAllViews();boolean wide=getResources().getConfiguration().screenWidthDp>=780;

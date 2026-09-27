@@ -52,7 +52,7 @@ def publish(apk, root, base, notes, sdk):
             if os.path.exists(tmp):os.unlink(tmp)
     return document
 
-DEFAULT_WEBSITE_SYNC = pathlib.Path(__file__).resolve().parents[3] / 'yuren.shi/scripts/sync-kid-release.py'
+DEFAULT_WEBSITE_SYNC = pathlib.Path(__file__).resolve().parents[3] / 'shiyu.ren/scripts/sync-kid-release.py'
 
 def publish_release(apk,root,base,notes,sdk,website_script=DEFAULT_WEBSITE_SYNC):
     """Publish once to the app service and website; failed website delivery is retryable."""

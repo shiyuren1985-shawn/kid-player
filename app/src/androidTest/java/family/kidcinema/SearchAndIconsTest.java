@@ -46,8 +46,8 @@ public class SearchAndIconsTest {
     }
     @Test public void searchUiSwitchesScopeClearsAndRoutesToResultOwner()throws Exception{
         store.toggleFavorite("bili:123","bili:"+id(123,0));store.progress("bili:123","bili:"+id(123,0),42000);
-        launch();device.findObject(By.desc("搜索视频关键词")).setText("太空");assertTrue(device.wait(Until.hasObject(By.text("搜索结果 · 1 个视频")),6000));
-        assertFalse(device.hasObject(By.text("太空飞船")));click(By.text("全部订阅"));assertTrue(device.wait(Until.hasObject(By.text("搜索结果 · 2 个视频")),6000));
+        launch();device.findObject(By.desc("搜索视频关键词")).setText("太空");click(By.desc("搜索视频"));assertTrue(device.wait(Until.hasObject(By.text("搜索结果 · 1 个视频")),6000));
+        assertFalse(device.hasObject(By.text("太空飞船")));click(By.desc("搜索范围"));click(By.text("全部订阅"));click(By.desc("搜索视频"));assertTrue(device.wait(Until.hasObject(By.text("搜索结果 · 2 个视频")),6000));
         assertTrue(device.wait(Until.hasObject(By.text("太空飞船")),5000));assertTrue(device.hasObject(By.text("继续 00:42")));assertTrue(device.hasObject(By.text("♥  已收藏")));
         assertTrue(device.hasObject(By.textContains("投稿尚未加载完整")));
         final Intent[] launched={null};Instrumentation instrumentation=InstrumentationRegistry.getInstrumentation();
@@ -57,14 +57,34 @@ public class SearchAndIconsTest {
         click(By.desc("清除搜索关键词"));assertTrue(device.findObject(By.desc("搜索视频关键词")).getText().matches("|搜索视频标题"));
         assertTrue(device.wait(Until.hasObject(By.text("全部投稿")),6000));
         for(int i=0;i<4&&!device.hasObject(By.text("森林里的动物"));i++)device.findObject(By.desc("影片列表")).scroll(Direction.DOWN,0.5f);
-        assertTrue(device.wait(Until.hasObject(By.text("森林里的动物")),3000));assertFalse(device.hasObject(By.text("太空飞船")));
+        if(!device.wait(Until.hasObject(By.text("森林里的动物")),3000)){
+            device.dumpWindowHierarchy(new java.io.File(context.getExternalFilesDir(null),"search-clear-failure.xml"));
+            throw new AssertionError("Clear search catalog="+store.feed()+" selected="+store.selectedCreator());
+        }assertFalse(device.hasObject(By.text("太空飞船")));
     }
     @Test public void searchUpdatesAfterFeedChangesAndSurvivesActivityRecreation()throws Exception{
-        launch();device.findObject(By.desc("搜索视频关键词")).setText("海底");click(By.text("全部订阅"));assertTrue(device.wait(Until.hasObject(By.text("海底故事")),6000));
+        launch();device.findObject(By.desc("搜索视频关键词")).setText("海底");click(By.desc("搜索范围"));click(By.text("全部订阅"));click(By.desc("搜索视频"));assertTrue(device.wait(Until.hasObject(By.text("海底故事")),6000));
         feed(123,true,"海底故事","海底新片");assertTrue(device.wait(Until.hasObject(By.text("海底新片")),6000));
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{for(Activity a:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED))if(a instanceof MainActivity){a.recreate();break;}});
         assertTrue(device.wait(Until.hasObject(By.text("搜索结果 · 2 个视频")),6000));assertEquals("海底",device.findObject(By.desc("搜索视频关键词")).getText());
         store.creatorEnabled(123,false);assertTrue(device.wait(Until.hasObject(By.text("没有找到匹配的视频，试试更短的关键词。")),6000));
+    }
+    @Test public void typingAndScopeStayDraftUntilButtonAndSurviveRecreation()throws Exception{
+        launch();UiObject2 input=device.findObject(By.desc("搜索视频关键词"));
+        if(context.getResources().getConfiguration().screenWidthDp>=700){
+            android.graphics.Rect brand=device.findObject(By.desc("kid player")).getVisibleBounds(), field=input.getVisibleBounds(), submit=device.findObject(By.desc("搜索视频")).getVisibleBounds();
+            assertTrue("Search must share the brand row",Math.abs(brand.centerY()-field.centerY())<brand.height());
+            assertTrue("Input must have usable width",field.width()>=100*context.getResources().getDisplayMetrics().density);
+            assertTrue("Input and submit must not overlap",field.right<=submit.left);
+        }
+        input.setText("太空");SystemClock.sleep(600);assertFalse(device.hasObject(By.textStartsWith("搜索结果")));assertTrue(device.hasObject(By.text("全部投稿")));
+        click(By.desc("搜索视频"));assertTrue(device.wait(Until.hasObject(By.text("搜索结果 · 1 个视频")),6000));
+        device.findObject(By.desc("搜索视频关键词")).setText("garbage accidental text");click(By.desc("搜索范围"));click(By.text("全部订阅"));SystemClock.sleep(600);
+        assertTrue(device.hasObject(By.text("搜索结果 · 1 个视频")));assertFalse(device.hasObject(By.text("太空飞船")));
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{for(Activity a:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED))if(a instanceof MainActivity){a.recreate();break;}});
+        assertTrue(device.wait(Until.hasObject(By.text("搜索结果 · 1 个视频")),6000));assertEquals("garbage accidental text",device.findObject(By.desc("搜索视频关键词")).getText());
+        click(By.desc("搜索视频"));assertTrue(device.wait(Until.hasObject(By.text("没有找到匹配的视频，试试更短的关键词。")),6000));
+        click(By.desc("清除搜索关键词"));assertTrue(device.wait(Until.hasObject(By.text("全部投稿")),6000));
     }
     @Test public void everyLauncherChoiceHasExactlyOneLaunchableAliasAndMainStaysEnabled()throws Exception{
         PackageManager pm=context.getPackageManager();
